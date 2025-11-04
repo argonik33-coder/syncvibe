@@ -1,0 +1,41 @@
+{
+  "name": "syncvibe",
+  "version": "1.0.0",
+  "description": "6 haneli kodla sesli sohbet odaları - Profesyonel Sürüm",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo 'No build step required'",
+    "test": "jest --coverage",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "express-validator": "^7.0.1",
+    "helmet": "^8.0.0",
+    "sanitize-html": "^2.11.0",
+    "socket.io": "^4.8.1",
+    "winston": "^3.13.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "video-chat",
+    "webrtc",
+    "realtime",
+    "socketio",
+    "voice-chat",
+    "collaboration"
+  ],
+  "author": "SyncVibe Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

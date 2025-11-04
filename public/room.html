@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="tr" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncVibe - Sohbet Odası</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .dark .glass {
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7e22ce 100%);
+        }
+        .message-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.3) transparent;
+        }
+        .message-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .message-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .message-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+        }
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 50%;
+            margin: 0 1px;
+            animation: typing-dot 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing-dot {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen transition-colors duration-300">
+    <!-- Bildirim Sistemi -->
+    <div id="notification" class="fixed top-4 right-4 glass rounded-xl p-4 text-white hidden z-50 transform transition-all duration-300">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle mr-3 text-lg"></i>
+            <span id="notificationText"></span>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="glass border-b border-white/20 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <!-- Logo ve Oda Bilgisi -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-white/20 rounded-lg p-2">
+                            <i class="fas fa-comments text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-white">SyncVibe</h1>
+                            <p class="text-blue-100 text-sm">v1.0</p>
+                        </div>
+                    </div>
+                    <div class="hidden md:block h-8 w-px bg-white/20"></div>
+                    <div class="hidden md:block">
+                        <p class="text-blue-100 text-sm">Oda Kodu</p>
+                        <p class="text-white font-mono font-bold text-lg" id="currentRoomCode">-----</p>
+                    </div>
+                    <div class="hidden md:block">
+                        <p class="text-blue-100 text-sm">Kullanıcı</p>
+                        <p class="text-white font-semibold text-sm" id="currentUserName">-----</p>
+                    </div>
+                </div>
+
+                <!-- Sağ Kontroller -->
+                <div class="flex items-center space-x-4">
+                    <!-- Katılımcı Sayısı -->
+                    <div class="hidden sm:flex items-center space-x-2 text-white bg-white/20 rounded-lg px-3 py-2">
+                        <i class="fas fa-users text-sm"></i>
+                        <span class="font-semibold" id="participantCount">0</span>
+                    </div>
+
+                    <!-- Bağlantı Durumu -->
+                    <div id="connectionStatus" class="hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
+                        <i class="fas fa-wifi text-sm"></i>
+                        <span class="text-sm font-medium">Bağlı</span>
+                    </div>
+
+                    <!-- Tema Butonu -->
+                    <button id="themeToggle" class="glass rounded-lg p-2 text-white hover:scale-110 transition-all duration-300">
+                        <i class="fas fa-moon text-lg"></i>
+                    </button>
+
+                    <!-- Çıkış Butonu -->
+                    <button 
+                        onclick="leaveRoom()"
+                        class="bg-red-500/20 hover:bg-red-500/30 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center space-x-2 border border-red-400/30"
+                    >
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="hidden sm:inline">Çıkış</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobil Oda Bilgisi -->
+            <div class="md:hidden pb-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-100 text-sm">Oda Kodu</p>
+                        <p class="text-white font-mono font-bold text-lg" id="mobileRoomCode">-----</p>
+                        <p class="text-blue-100 text-sm mt-1">Kullanıcı: <span id="mobileUserName" class="text-white">-----</span></p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-2 text-white bg-white/20 rounded-lg px-3 py-2">
+                            <i class="fas fa-users text-sm"></i>
+                            <span class="font-semibold" id="mobileParticipantCount">0</span>
+                        </div>
+                        <div id="mobileConnectionStatus" class="flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
+                            <i class="fas fa-wifi text-sm"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ana İçerik -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <!-- Sol Sidebar - Katılımcılar -->
+            <div class="xl:col-span-1">
+                <div class="glass rounded-2xl p-6 h-full">
+                    <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i class="fas fa-user-friends mr-3 text-blue-200"></i>
+                        Katılımcılar
+                        <span class="ml-2 bg-white/20 text-white text-sm px-2 py-1 rounded-full" id="participantCountBadge">0</span>
+                    </h2>
+                    
+                    <!-- Yazıyor İndikatörü -->
+                    <div id="typingIndicator" class="hidden mb-3 p-2 bg-white/10 rounded-lg">
+                        <div class="flex items-center text-blue-200 text-sm">
+                            <span id="typingUsers" class="mr-2"></span>
+                            <div class="typing-indicator">
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="participantsList" class="space-y-3 max-h-80 xl:max-h-[calc(100vh-300px)] overflow-y-auto message-scroll">
+                        <!-- Katılımcılar buraya eklenecek -->
+                        <div class="text-center py-8">
+                            <i class="fas fa-users text-2xl text-white/50 mb-3"></i>
+                            <p class="text-blue-200 text-sm">Henüz katılımcı yok</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orta Alan - Sohbet ve Medya -->
+            <div class="xl:col-span-2">
+                <!-- Sohbet Kutusu -->
+                <div class="glass rounded-2xl h-full flex flex-col">
+                    <!-- Mesajlar -->
+                    <div id="messages" class="flex-1 p-6 space-y-4 overflow-y-auto message-scroll max-h-[500px] xl:max-h-[calc(100vh-300px)]">
+                        <div class="text-center py-12">
+                            <i class="fas fa-comments text-3xl text-white/50 mb-4"></i>
+                            <p class="text-blue-200 text-lg font-semibold">Sohbet Başlatın</p>
+                            <p class="text-blue-200 text-sm mt-2">Mesaj göndererek sohbeti başlatın</p>
+                        </div>
+                    </div>
+
+                    <!-- Mesaj Gönderme -->
+                    <div class="border-t border-white/20 p-6">
+                        <div class="flex space-x-4">
+                            <input 
+                                type="text" 
+                                id="messageInput"
+                                placeholder="Mesajınızı yazın..."
+                                class="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all duration-300"
+                                oninput="handleTyping()"
+                            >
+                            <button 
+                                onclick="sendMessage()"
+                                class="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="sendMessageBtn"
+                            >
+                                <i class="fas fa-paper-plane"></i>
+                                <span class="hidden sm:inline">Gönder</span>
+                            </button>
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <div class="text-blue-200 text-xs">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Enter tuşu ile gönderebilirsiniz
+                            </div>
+                            <div class="text-blue-200 text-xs">
+                                <span id="charCount">0</span>/500
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Sidebar - Kontroller -->
+            <div class="xl:col-span-1">
+                <div class="space-y-6">
+                    <!-- Ses Kontrolleri -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                            <i class="fas fa-microphone mr-3 text-green-200"></i>
+                            Ses Kontrolleri
+                        </h2>
+                        
+                        <div class="space-y-4">
+                            <button 
+                                id="micBtn"
+                                onclick="toggleMic()"
+                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                            >
+                                <i class="fas fa-microphone-slash"></i>
+                                <span>Mikrofonu Aç</span>
+                            </button>
+                            
+                            <div class="bg-white/10 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-blue-200 text-sm">Ses Seviyesi</span>
+                                    <span class="text-white text-sm" id="volumeLevel">%50</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="100" 
+                                    value="50"
+                                    class="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                                    oninput="updateVolume(this.value)"
+                                >
+                            </div>
+
+                            <!-- Ses Testi -->
+                            <button 
+                                onclick="testAudio()"
+                                class="w-full bg-blue-500/20 hover:bg-blue-500/30 text-white py-2 px-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-blue-400/30 text-sm"
+                            >
+                                <i class="fas fa-volume-up"></i>
+                                <span>Sesi Test Et</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Paylaşım Kontrolleri -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                            <i class="fas fa-desktop mr-3 text-purple-200"></i>
+                            Paylaşım
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <button 
+                                id="screenBtn"
+                                onclick="toggleScreenShare()"
+                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                            >
+                                <i class="fas fa-desktop"></i>
+                                <span>Ekran Paylaş</span>
+                            </button>
+                            
+                            <button 
+                                id="fileBtn"
+                                onclick="shareFile()"
+                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                            >
+                                <i class="fas fa-file-upload"></i>
+                                <span>Dosya Paylaş</span>
+                            </button>
+
+                            <button 
+                                id="cameraBtn"
+                                onclick="toggleCamera()"
+                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                            >
+                                <i class="fas fa-video"></i>
+                                <span>Kamerayı Aç</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Oda Bilgileri -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                            <i class="fas fa-info-circle mr-3 text-blue-200"></i>
+                            Oda Bilgileri
+                        </h2>
+                        
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Oluşturulma</span>
+                                <span class="text-white" id="roomCreated">--:--</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Süre</span>
+                                <span class="text-white" id="roomDuration">00:00</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Durum</span>
+                                <span class="text-green-200 flex items-center">
+                                    <i class="fas fa-circle text-xs mr-1"></i>
+                                    Aktif
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Versiyon</span>
+                                <span class="text-white">v1.0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hızlı Erişim -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                            <i class="fas fa-bolt mr-3 text-yellow-200"></i>
+                            Hızlı Erişim
+                        </h2>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <button 
+                                onclick="copyRoomCode()"
+                                class="bg-white/10 hover:bg-white/20 text-white py-2 px-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20 text-sm"
+                            >
+                                <i class="fas fa-copy"></i>
+                                <span>Kodu Kopyala</span>
+                            </button>
+                            <button 
+                                onclick="inviteUsers()"
+                                class="bg-white/10 hover:bg-white/20 text-white py-2 px-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20 text-sm"
+                            >
+                                <i class="fas fa-share-alt"></i>
+                                <span>Davet Et</span>
+                            </button>
+                            <button 
+                                onclick="toggleFullscreen()"
+                                class="bg-white/10 hover:bg-white/20 text-white py-2 px-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20 text-sm"
+                            >
+                                <i class="fas fa-expand"></i>
+                                <span>Tam Ekran</span>
+                            </button>
+                            <button 
+                                onclick="showShortcuts()"
+                                class="bg-white/10 hover:bg-white/20 text-white py-2 px-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20 text-sm"
+                            >
+                                <i class="fas fa-keyboard"></i>
+                                <span>Kısayollar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Değişkenler
+        let roomStartTime = null;
+        let typingTimer = null;
+        let isTyping = false;
+
+        // Tema değiştirme
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = themeToggle.querySelector('i');
+        
+        themeToggle.addEventListener('click', () => {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            
+            if (isDark) {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                themeIcon.className = 'fas fa-moon text-lg';
+                showNotification('Açık tema etkinleştirildi', 'success');
+            } else {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                themeIcon.className = 'fas fa-sun text-lg';
+                showNotification('Koyu tema etkinleştirildi', 'success');
+            }
+        });
+
+        // Socket.io bağlantısı
+        const socket = io();
+
+        // Bağlantı durumu takibi
+        socket.on('connect', () => {
+            updateConnectionStatus(true);
+            showNotification('Sunucuya bağlandı', 'success');
+        });
+
+        socket.on('disconnect', () => {
+            updateConnectionStatus(false);
+            showNotification('Sunucu bağlantısı kesildi', 'error');
+        });
+
+        socket.on('reconnect', () => {
+            updateConnectionStatus(true);
+            showNotification('Sunucuya yeniden bağlandı', 'success');
+        });
+
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomCode = urlParams.get('code');
+            const userName = urlParams.get('name') || 'Kullanıcı-' + Math.floor(Math.random() * 1000);
+            
+            if (roomCode) {
+                document.getElementById('currentRoomCode').textContent = roomCode;
+                document.getElementById('mobileRoomCode').textContent = roomCode;
+                document.getElementById('currentUserName').textContent = userName;
+                document.getElementById('mobileUserName').textContent = userName;
+                
+                socket.emit('join-room', {
+                    roomCode: roomCode,
+                    userName: userName
+                });
+                
+                startRoomTimer();
+                showNotification(`${roomCode} odasına hoş geldiniz, ${userName}!`, 'success');
+            } else {
+                window.location.href = '/';
+            }
+
+            // Karakter sayacı
+            document.getElementById('messageInput').addEventListener('input', function() {
+                const charCount = this.value.length;
+                document.getElementById('charCount').textContent = charCount;
+                
+                if (charCount > 500) {
+                    this.value = this.value.substring(0, 500);
+                    document.getElementById('charCount').textContent = 500;
+                    showNotification('Mesaj 500 karakteri geçemez!', 'error');
+                }
+            });
+        });
+
+        // Oda süresi sayacı
+        function startRoomTimer() {
+            roomStartTime = new Date();
+            let seconds = 0;
+            setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                document.getElementById('roomDuration').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        // Ses seviyesi güncelleme
+        function updateVolume(value) {
+            document.getElementById('volumeLevel').textContent = `%${value}`;
+        }
+
+        // Bağlantı durumu güncelleme
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const mobileStatusElement = document.getElementById('mobileConnectionStatus');
+            const icon = statusElement?.querySelector('i');
+            const mobileIcon = mobileStatusElement?.querySelector('i');
+            
+            if (connected) {
+                statusElement.className = 'hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                mobileStatusElement.className = 'flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                if (icon) icon.className = 'fas fa-wifi text-sm';
+                if (mobileIcon) mobileIcon.className = 'fas fa-wifi text-sm';
+                statusElement.querySelector('span').textContent = 'Bağlı';
+            } else {
+                statusElement.className = 'hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                mobileStatusElement.className = 'flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                if (icon) icon.className = 'fas fa-wifi-slash text-sm';
+                if (mobileIcon) mobileIcon.className = 'fas fa-wifi-slash text-sm';
+                statusElement.querySelector('span').textContent = 'Bağlantı Yok';
+            }
+        }
+
+        // Odadan ayrılma
+        function leaveRoom() {
+            if (confirm('Odadan çıkmak istediğinize emin misiniz?')) {
+                showNotification('Odadan ayrılıyorsunuz...', 'info');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            }
+        }
+
+        // Mikrofon kontrolü
+        function toggleMic() {
+            const micBtn = document.getElementById('micBtn');
+            const icon = micBtn.querySelector('i');
+            const text = micBtn.querySelector('span');
+            
+            if (icon.classList.contains('fa-microphone-slash')) {
+                icon.className = 'fas fa-microphone';
+                text.textContent = 'Mikrofonu Kapat';
+                micBtn.classList.add('bg-green-500/20', 'border-green-400/30');
+                showNotification('Mikrofon açıldı', 'success');
+            } else {
+                icon.className = 'fas fa-microphone-slash';
+                text.textContent = 'Mikrofonu Aç';
+                micBtn.classList.remove('bg-green-500/20', 'border-green-400/30');
+                showNotification('Mikrofon kapatıldı', 'info');
+            }
+        }
+
+        // Kamera kontrolü
+        function toggleCamera() {
+            const cameraBtn = document.getElementById('cameraBtn');
+            const icon = cameraBtn.querySelector('i');
+            const text = cameraBtn.querySelector('span');
+            
+            if (icon.classList.contains('fa-video')) {
+                icon.className = 'fas fa-video-slash';
+                text.textContent = 'Kamerayı Aç';
+                cameraBtn.classList.remove('bg-green-500/20', 'border-green-400/30');
+                showNotification('Kamera kapatıldı', 'info');
+            } else {
+                icon.className = 'fas fa-video';
+                text.textContent = 'Kamerayı Kapat';
+                cameraBtn.classList.add('bg-green-500/20', 'border-green-400/30');
+                showNotification('Kamera açıldı', 'success');
+            }
+        }
+
+        // Ekran paylaşımı
+        function toggleScreenShare() {
+            const screenBtn = document.getElementById('screenBtn');
+            const icon = screenBtn.querySelector('i');
+            const text = screenBtn.querySelector('span');
+            
+            if (icon.classList.contains('fa-desktop')) {
+                icon.className = 'fas fa-stop';
+                text.textContent = 'Paylaşımı Durdur';
+                screenBtn.classList.add('bg-purple-500/20', 'border-purple-400/30');
+                showNotification('Ekran paylaşımı başlatıldı', 'success');
+            } else {
+                icon.className = 'fas fa-desktop';
+                text.textContent = 'Ekran Paylaş';
+                screenBtn.classList.remove('bg-purple-500/20', 'border-purple-400/30');
+                showNotification('Ekran paylaşımı durduruldu', 'info');
+            }
+        }
+
+        // Dosya paylaşımı
+        function shareFile() {
+            showNotification('Dosya paylaşım özelliği yakında eklenecek!', 'info');
+        }
+
+        // Ses testi
+        function testAudio() {
+            showNotification('Ses testi çalıştırılıyor...', 'info');
+        }
+
+        // Oda kodunu kopyala
+        function copyRoomCode() {
+            const roomCode = document.getElementById('currentRoomCode').textContent;
+            navigator.clipboard.writeText(roomCode).then(() => {
+                showNotification('Oda kodu panoya kopyalandı!', 'success');
+            });
+        }
+
+        // Kullanıcı davet et
+        function inviteUsers() {
+            const roomCode = document.getElementById('currentRoomCode').textContent;
+            const inviteText = `SyncVibe odasına katılın! Oda Kodu: ${roomCode}\n${window.location.origin}?code=${roomCode}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'SyncVibe Davet',
+                    text: inviteText
+                });
+            } else {
+                navigator.clipboard.writeText(inviteText).then(() => {
+                    showNotification('Davet bağlantısı panoya kopyalandı!', 'success');
+                });
+            }
+        }
+
+        // Tam ekran
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    showNotification('Tam ekran hatası: ' + err.message, 'error');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Kısayollar
+        function showShortcuts() {
+            const shortcuts = [
+                'Enter: Mesaj gönder',
+                'Ctrl+Enter: Yeni satır',
+                'Ctrl+K: Odadan ayrıl',
+                'Ctrl+M: Mikrofon aç/kapa',
+                'Ctrl+E: Ekran paylaş'
+            ];
+            
+            showNotification(shortcuts.join(' | '), 'info');
+        }
+
+        // Yazma indikatörü
+        function handleTyping() {
+            if (!isTyping) {
+                isTyping = true;
+                socket.emit('typing-start');
+            }
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                isTyping = false;
+                socket.emit('typing-stop');
+            }, 1000);
+        }
+
+        // Mesaj gönderme
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                socket.emit('send-message', {
+                    text: message,
+                    timestamp: new Date().toISOString()
+                });
+                messageInput.value = '';
+                document.getElementById('charCount').textContent = '0';
+                
+                // Yazma durdur
+                if (isTyping) {
+                    isTyping = false;
+                    socket.emit('typing-stop');
+                }
+            }
+        }
+
+        // Enter tuşu ile mesaj gönderme
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Bildirim gösterme fonksiyonu
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const text = document.getElementById('notificationText');
+            const icon = notification.querySelector('i');
+            
+            notification.className = 'fixed top-4 right-4 glass rounded-xl p-4 text-white z-50 transform transition-all duration-300';
+            
+            if (type === 'error') {
+                notification.classList.add('bg-red-500/80');
+                icon.className = 'fas fa-exclamation-circle mr-3 text-lg';
+            } else if (type === 'success') {
+                notification.classList.add('bg-green-500/80');
+                icon.className = 'fas fa-check-circle mr-3 text-lg';
+            } else {
+                notification.classList.add('bg-blue-500/80');
+                icon.className = 'fas fa-info-circle mr-3 text-lg';
+            }
+            
+            text.textContent = message;
+            notification.classList.remove('hidden', 'opacity-0', 'translate-x-full');
+            notification.classList.add('opacity-100', 'translate-x-0');
+            
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'translate-x-full');
+                setTimeout(() => notification.classList.add('hidden'), 300);
+            }, 4000);
+        }
+
+        // Socket event listener'ları
+        socket.on('new-message', (messageData) => {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            
+            if (messageData.type === 'system') {
+                messageElement.className = 'text-center py-2';
+                messageElement.innerHTML = `
+                    <span class="bg-white/10 text-blue-200 text-sm px-3 py-1 rounded-full backdrop-blur-sm">
+                        <i class="fas fa-info-circle mr-2"></i>${messageData.text}
+                    </span>
+                `;
+            } else {
+                const isOwnMessage = messageData.userId === socket.id;
+                messageElement.className = `bg-white/10 rounded-2xl p-4 backdrop-blur-sm ${isOwnMessage ? 'border-l-4 border-blue-400' : ''}`;
+                messageElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-semibold text-white ${isOwnMessage ? 'text-blue-300' : ''}">
+                            ${messageData.user}
+                            ${isOwnMessage ? ' <i class="fas fa-user text-xs"></i>' : ''}
+                        </span>
+                        <span class="text-blue-200 text-sm">${messageData.timestamp}</span>
+                    </div>
+                    <p class="text-white">${messageData.text}</p>
+                `;
+            }
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            // İlk mesajda hoş geldin mesajını kaldır
+            const welcomeMessage = messagesDiv.querySelector('.text-center');
+            if (welcomeMessage && messageData.type !== 'system') {
+                welcomeMessage.remove();
+            }
+        });
+
+        socket.on('update-participants', (users) => {
+            const participantsList = document.getElementById('participantsList');
+            const participantCount = document.getElementById('participantCount');
+            const mobileParticipantCount = document.getElementById('mobileParticipantCount');
+            const participantCountBadge = document.getElementById('participantCountBadge');
+            
+            participantsList.innerHTML = '';
+            participantCount.textContent = users.length;
+            mobileParticipantCount.textContent = users.length;
+            participantCountBadge.textContent = users.length;
+            
+            if (users.length === 0) {
+                participantsList.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-users text-2xl text-white/50 mb-3"></i>
+                        <p class="text-blue-200 text-sm">Henüz katılımcı yok</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            users.forEach(user => {
+                const participantElement = document.createElement('div');
+                participantElement.className = 'flex items-center p-3 bg-white/10 rounded-xl backdrop-blur-sm';
+                participantElement.innerHTML = `
+                    <div class="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full mr-3">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium text-white text-sm flex items-center">
+                            ${user.name}
+                            ${user.isHost ? ' <span class="ml-2 bg-yellow-500/20 text-yellow-200 text-xs px-2 py-0.5 rounded">Host</span>' : ''}
+                        </div>
+                        <div class="text-blue-200 text-xs">${user.id.substring(0, 8)}</div>
+                    </div>
+                    <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                `;
+                participantsList.appendChild(participantElement);
+            });
+        });
+
+        // Odaya katıldığında
+        socket.on('room-joined', (data) => {
+            const roomCreatedTime = new Date(data.roomCreatedAt).toLocaleTimeString('tr-TR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('roomCreated').textContent = roomCreatedTime;
+            
+            showNotification(`${data.roomCode} odasına başarıyla katıldınız`, 'success');
+        });
+
+        // Kullanıcı katıldı/ayrıldı
+        socket.on('user-joined', (user) => {
+            showNotification(`${user.name} odaya katıldı`, 'info');
+        });
+
+        socket.on('user-left', (user) => {
+            showNotification(`${user.name} odadan ayrıldı`, 'info');
+        });
+
+        // Klavye kısayolları
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+K - Odadan ayrıl
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                leaveRoom();
+            }
+            
+            // Ctrl+M - Mikrofon aç/kapa
+            if (e.ctrlKey && e.key === 'm') {
+                e.preventDefault();
+                toggleMic();
+            }
+            
+            // Ctrl+E - Ekran paylaş
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                toggleScreenShare();
+            }
+            
+            // Escape - Tam ekrandan çık
+            if (e.key === 'Escape' && document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        });
+
+        // Sayfa kapatma uyarısı
+        window.addEventListener('beforeunload', function(e) {
+            if (document.getElementById('participantCount').textContent !== '0') {
+                e.preventDefault();
+                e.returnValue = 'Odadan ayrılmak istediğinize emin misiniz?';
+            }
+        });
+    </script>
+</body>
+</html>
