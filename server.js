@@ -1,4 +1,4 @@
-// server.js - Render için güncellendi
+// server.js - Render için optimize edilmiş
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -6,31 +6,11 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { body, validationResult } = require('express-validator');
 const sanitizeHtml = require('sanitize-html');
-const winston = require('winston');
 
 // Render-specific configuration
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
-
-// Logger konfigürasyonu
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
-  ]
-});
 
 const app = express();
 const server = http.createServer(app);
@@ -44,13 +24,13 @@ const io = socketIo(server, {
   },
   pingTimeout: 60000,
   pingInterval: 25000,
-  transports: ['websocket', 'polling'] // Render için gerekli
+  transports: ['websocket', 'polling']
 });
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: {
     error: 'Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.'
   }
@@ -58,15 +38,13 @@ const limiter = rateLimit({
 
 // Middleware'ler
 app.use(helmet({
-  contentSecurityPolicy: false, // Render için CSP devre dışı
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
 
 app.use(cors());
 app.use(limiter);
 app.use(express.json({ limit: '10kb' }));
-
-// Static files - Render için public klasörü
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Ana sayfa route'u
@@ -121,7 +99,7 @@ const config = {
   }
 };
 
-// Doğrulama fonksiyonları (önceki kodun aynısı)
+// Doğrulama fonksiyonları
 const validateJoinRoom = (data) => {
   const errors = [];
   
@@ -176,7 +154,7 @@ const validateMessage = (text) => {
   return { isValid: true, sanitizedText };
 };
 
-// Oda yönetimi (önceki kodun aynısı)
+// Oda yönetimi
 const rooms = new Map();
 const userSessions = new Map();
 const socketRateLimitMap = new Map();
@@ -202,12 +180,12 @@ function cleanupInactiveRooms() {
     if (room.users.length === 0 && (now - room.lastActivity) > config.rooms.inactiveTimeout) {
       rooms.delete(roomCode);
       cleanedCount++;
-      logger.info(`Inaktif oda temizlendi: ${roomCode}`);
+      console.log(`Inaktif oda temizlendi: ${roomCode}`);
     }
   }
 
   if (cleanedCount > 0) {
-    logger.info(`${cleanedCount} inaktif oda temizlendi`);
+    console.log(`${cleanedCount} inaktif oda temizlendi`);
   }
 }
 
@@ -241,12 +219,9 @@ const checkSocketRateLimit = (socket) => {
   return true;
 };
 
-// Socket.io bağlantıları (önceki kodun aynısı)
+// Socket.io bağlantıları
 io.on('connection', (socket) => {
-  logger.info('Yeni kullanıcı bağlandı', { 
-    socketId: socket.id, 
-    ip: socket.handshake.address 
-  });
+  console.log('Yeni kullanıcı bağlandı:', socket.id);
 
   userSessions.set(socket.id, {
     id: socket.id,
@@ -300,7 +275,7 @@ io.on('connection', (socket) => {
       roomCode = generateRoomCode();
       attempts++;
       if (attempts > 10) {
-        logger.error('Oda kodu oluşturma başarısız', { socketId: socket.id });
+        console.error('Oda kodu oluşturma başarısız:', socket.id);
         socket.emit('error', 'Oda oluşturulamadı. Lütfen tekrar deneyin.');
         return;
       }
@@ -328,11 +303,7 @@ io.on('connection', (socket) => {
     
     rooms.set(roomCode, newRoom);
     
-    logger.info('Yeni oda oluşturuldu', { 
-      roomCode, 
-      createdBy: newRoom.createdBy,
-      socketId: socket.id 
-    });
+    console.log('Yeni oda oluşturuldu:', roomCode);
     
     socket.emit('room-created', roomCode);
     updateStats();
@@ -413,12 +384,7 @@ io.on('connection', (socket) => {
       messageId: generateMessageId()
     });
     
-    logger.info('Kullanıcı odaya katıldı', {
-      roomCode,
-      userName: user.name,
-      userCount: room.users.length,
-      socketId: socket.id
-    });
+    console.log('Kullanıcı odaya katıldı:', user.name, 'Oda:', roomCode);
     
     updateStats();
   });
@@ -458,21 +424,13 @@ io.on('connection', (socket) => {
         
         io.to(socket.roomCode).emit('new-message', message);
         
-        logger.info('Yeni mesaj', {
-          roomCode: socket.roomCode,
-          userName: user.name,
-          messageLength: message.text.length,
-          socketId: socket.id
-        });
+        console.log('Yeni mesaj:', user.name, '-', message.text.substring(0, 50));
       }
     }
   });
 
   socket.on('disconnect', (reason) => {
-    logger.info('Kullanıcı ayrıldı', { 
-      socketId: socket.id, 
-      reason
-    });
+    console.log('Kullanıcı ayrıldı:', socket.id, reason);
     
     if (socket.roomCode && rooms.has(socket.roomCode)) {
       const room = rooms.get(socket.roomCode);
@@ -493,7 +451,6 @@ io.on('connection', (socket) => {
           messageId: generateMessageId()
         });
         
-        // Oda boşsa temizleme zamanını güncelle
         if (room.users.length === 0) {
           room.lastActivity = new Date();
         }
@@ -531,17 +488,15 @@ setInterval(() => {
 
 // Sunucuyu başlat
 server.listen(PORT, '0.0.0.0', () => {
-  logger.info(`SyncVibe sunucusu Render'da başlatıldı`, {
-    port: PORT,
-    environment: process.env.NODE_ENV || 'development'
-  });
+  console.log(`SyncVibe sunucusu ${PORT} portunda başlatıldı`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM alındı, sunucu kapatılıyor...');
+  console.log('SIGTERM alındı, sunucu kapatılıyor...');
   server.close(() => {
-    logger.info('Sunucu kapatıldı');
+    console.log('Sunucu kapatıldı');
     process.exit(0);
   });
 });
