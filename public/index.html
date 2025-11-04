@@ -137,6 +137,7 @@
                     <button 
                         onclick="createRoom()"
                         class="w-full bg-green-500/20 hover:bg-green-500/30 text-white py-3 px-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center group border border-green-400/30"
+                        id="createRoomBtn"
                     >
                         <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-300"></i>
                         Yeni Oda Oluştur
@@ -204,7 +205,6 @@
             const text = document.getElementById('notificationText');
             const icon = notification.querySelector('i');
             
-            // Temizle ve type'a göre ayarla
             notification.className = 'fixed top-4 right-4 glass rounded-xl p-4 text-white z-50 transform transition-all duration-300';
             
             if (type === 'error') {
@@ -222,7 +222,6 @@
             notification.classList.remove('hidden', 'opacity-0', 'translate-x-full');
             notification.classList.add('opacity-100', 'translate-x-0');
             
-            // 4 saniye sonra gizle
             setTimeout(() => {
                 notification.classList.add('opacity-0', 'translate-x-full');
                 setTimeout(() => notification.classList.add('hidden'), 300);
@@ -231,14 +230,13 @@
 
         // İstatistikleri güncelle
         function updateStats() {
-            fetch('/status')
+            fetch('/api/status')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('activeRooms').textContent = data.roomCount;
                     document.getElementById('totalUsers').textContent = data.totalUsers;
                 })
                 .catch(() => {
-                    // Hata durumunda göster
                     document.getElementById('activeRooms').textContent = '0';
                     document.getElementById('totalUsers').textContent = '0';
                 });
@@ -259,10 +257,8 @@
                 return;
             }
 
-            // Oda kontrolü için sunucuya istek gönder
             socket.emit('check-room', roomCode);
             
-            // Geçici buton durumu
             const btn = event.target;
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Kontrol Ediliyor...';
@@ -277,7 +273,7 @@
         // Yeni oda oluşturma fonksiyonu
         function createRoom() {
             const userName = document.getElementById('userName').value.trim() || 'Misafir' + Math.floor(Math.random() * 1000);
-            const btn = event.target;
+            const btn = document.getElementById('createRoomBtn');
             const originalText = btn.innerHTML;
             
             if (!userName) {
@@ -285,7 +281,6 @@
                 return;
             }
             
-            // Butonu yükleniyor durumuna getir
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Oluşturuluyor...';
             btn.disabled = true;
             
@@ -297,23 +292,27 @@
             const userName = document.getElementById('userName').value.trim() || 'Misafir' + Math.floor(Math.random() * 1000);
             const newRoomCodeDiv = document.getElementById('newRoomCode');
             const generatedCode = document.getElementById('generatedCode');
+            const btn = document.getElementById('createRoomBtn');
             
             generatedCode.textContent = roomCode;
             newRoomCodeDiv.classList.remove('hidden');
             
             showNotification('Oda başarıyla oluşturuldu!', 'success');
             
-            // 1.5 saniye sonra oda sayfasına yönlendir
+            // Butonu resetle
+            btn.innerHTML = '<i class="fas fa-plus mr-2"></i>Yeni Oda Oluştur';
+            btn.disabled = false;
+            
             setTimeout(() => {
                 window.location.href = `/room.html?code=${roomCode}&name=${encodeURIComponent(userName)}`;
             }, 1500);
         });
 
-        socket.on('room-exists', (exists) => {
+        socket.on('room-exists', (data) => {
             const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
             const userName = document.getElementById('userName').value.trim() || 'Misafir' + Math.floor(Math.random() * 1000);
             
-            if (exists) {
+            if (data.exists) {
                 showNotification('Odaya katılılıyor...', 'success');
                 setTimeout(() => {
                     window.location.href = `/room.html?code=${roomCode}&name=${encodeURIComponent(userName)}`;
@@ -331,8 +330,7 @@
         socket.on('error', (errorMessage) => {
             showNotification('Hata: ' + errorMessage, 'error');
             
-            // Butonu eski haline getir
-            const btn = document.querySelector('button[onclick="createRoom()"]');
+            const btn = document.getElementById('createRoomBtn');
             if (btn) {
                 btn.innerHTML = '<i class="fas fa-plus mr-2"></i>Yeni Oda Oluştur';
                 btn.disabled = false;
@@ -355,10 +353,7 @@
         // Sayfa yüklendiğinde istatistikleri getir
         document.addEventListener('DOMContentLoaded', function() {
             updateStats();
-            // Her 30 saniyede bir istatistikleri güncelle
             setInterval(updateStats, 30000);
-            
-            // Kullanıcı adı input'una odaklan
             document.getElementById('userName').focus();
         });
     </script>

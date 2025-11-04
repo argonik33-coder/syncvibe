@@ -32,7 +32,7 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: {
-    error: 'Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.'
+    error: 'Çok fazla istek gönderiyorsunuz. Lütfen bekleyin.'
   }
 });
 
@@ -251,7 +251,7 @@ io.on('connection', (socket) => {
     socket.emit('room-exists', { exists: exists });
   });
 
-  // Yeni oda oluşturma
+  // Yeni oda oluşturma - DÜZELTİLMİŞ
   socket.on('create-room', (userData) => {
     if (!checkSocketRateLimit(socket)) {
       socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
@@ -260,12 +260,24 @@ io.on('connection', (socket) => {
 
     userSessions.get(socket.id).lastActivity = new Date();
     
-    const validationErrors = validateJoinRoom({ 
-      roomCode: 'TEMPORARY', 
-      userName: userData?.name 
+    // SADECE KULLANICI ADI VALIDATION
+    if (!userData || !userData.name || typeof userData.name !== 'string') {
+      socket.emit('error', 'Kullanıcı adı gereklidir');
+      return;
+    }
+
+    const sanitizedUserName = sanitizeHtml(userData.name.trim(), {
+      allowedTags: [],
+      allowedAttributes: {}
     });
-    if (validationErrors.length > 0) {
-      socket.emit('error', validationErrors[0]);
+    
+    if (sanitizedUserName.length === 0) {
+      socket.emit('error', 'Geçersiz kullanıcı adı');
+      return;
+    }
+    
+    if (sanitizedUserName.length > config.rooms.maxUsernameLength) {
+      socket.emit('error', `Kullanıcı adı ${config.rooms.maxUsernameLength} karakteri geçemez`);
       return;
     }
 
@@ -287,7 +299,7 @@ io.on('connection', (socket) => {
       users: [],
       createdAt: createdAt,
       lastActivity: createdAt,
-      createdBy: sanitizeHtml(userData.name.trim(), { allowedTags: [], allowedAttributes: {} }),
+      createdBy: sanitizedUserName,
       createdBySocketId: socket.id,
       settings: {
         maxUsers: config.rooms.maxUsers,
@@ -303,7 +315,7 @@ io.on('connection', (socket) => {
     
     rooms.set(roomCode, newRoom);
     
-    console.log('Yeni oda oluşturuldu:', roomCode);
+    console.log('Yeni oda oluşturuldu:', roomCode, 'Oluşturan:', sanitizedUserName);
     
     socket.emit('room-created', roomCode);
     updateStats();
