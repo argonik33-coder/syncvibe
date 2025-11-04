@@ -59,6 +59,87 @@
             0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
             30% { transform: translateY(-4px); opacity: 1; }
         }
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            min-height: 200px;
+        }
+        .video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-overlay {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .audio-visualizer {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .audio-level {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            transition: width 0.1s ease;
+        }
+        .participant-muted {
+            opacity: 0.6;
+        }
+        .participant-muted .fa-microphone {
+            color: #ef4444 !important;
+        }
+        .participants-container {
+            transition: all 0.3s ease;
+            min-width: 280px;
+            max-width: 400px;
+        }
+        @media (max-width: 1280px) {
+            .participants-container {
+                max-width: 100%;
+            }
+        }
+        .system-message {
+            text-align: center;
+            color: #93c5fd;
+            font-style: italic;
+            margin: 8px 0;
+        }
+        .audio-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .audio-speaking {
+            background: #10b981;
+        }
+        .audio-muted {
+            background: #ef4444;
+        }
     </style>
 </head>
 <body class="gradient-bg min-h-screen transition-colors duration-300">
@@ -110,6 +191,12 @@
                         <span class="text-sm font-medium">Bağlı</span>
                     </div>
 
+                    <!-- Mikrofon Durumu -->
+                    <div id="globalMicStatus" class="hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2">
+                        <i class="fas fa-microphone-slash text-sm"></i>
+                        <span class="text-sm font-medium">Sessiz</span>
+                    </div>
+
                     <!-- Tema Butonu -->
                     <button id="themeToggle" class="glass rounded-lg p-2 text-white hover:scale-110 transition-all duration-300">
                         <i class="fas fa-moon text-lg"></i>
@@ -142,6 +229,9 @@
                         <div id="mobileConnectionStatus" class="flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
                             <i class="fas fa-wifi text-sm"></i>
                         </div>
+                        <div id="mobileMicStatus" class="flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2">
+                            <i class="fas fa-microphone-slash text-sm"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,9 +240,14 @@
 
     <!-- Ana İçerik -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Video Grid -->
+        <div id="videoGrid" class="video-grid">
+            <!-- Videolar burada görünecek -->
+        </div>
+
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <!-- Sol Sidebar - Katılımcılar -->
-            <div class="xl:col-span-1">
+            <div class="xl:col-span-1 participants-container">
                 <div class="glass rounded-2xl p-6 h-full">
                     <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
                         <i class="fas fa-user-friends mr-3 text-blue-200"></i>
@@ -177,6 +272,35 @@
                         <div class="text-center py-8">
                             <i class="fas fa-users text-2xl text-white/50 mb-3"></i>
                             <p class="text-blue-200 text-sm">Henüz katılımcı yok</p>
+                        </div>
+                    </div>
+
+                    <!-- Bağlantı Bilgileri ve İstatistikler -->
+                    <div class="mt-6 pt-4 border-t border-white/20">
+                        <div class="space-y-3 text-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Bağlantı:</span>
+                                <span id="connectionInfo" class="text-green-200 flex items-center">
+                                    <i class="fas fa-circle text-xs mr-1"></i>
+                                    Stabil
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Gecikme:</span>
+                                <span class="text-white" id="latencyInfo">~25ms</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Ses Kalitesi:</span>
+                                <span class="text-white" id="audioQuality">HD</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Aktif Süre:</span>
+                                <span class="text-white" id="activeDuration">00:00</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Toplam Mesaj:</span>
+                                <span class="text-white" id="totalMessages">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -241,25 +365,24 @@
                             <button 
                                 id="micBtn"
                                 onclick="toggleMic()"
-                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                                class="w-full bg-red-500/20 hover:bg-red-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-red-400/30"
                             >
                                 <i class="fas fa-microphone-slash"></i>
                                 <span>Mikrofonu Aç</span>
                             </button>
                             
+                            <!-- Ses Seviye Göstergesi -->
                             <div class="bg-white/10 rounded-lg p-4">
                                 <div class="flex items-center justify-between mb-2">
-                                    <span class="text-blue-200 text-sm">Ses Seviyesi</span>
-                                    <span class="text-white text-sm" id="volumeLevel">%50</span>
+                                    <span class="text-blue-200 text-sm">Ses Durumu</span>
+                                    <span class="text-green-200 text-sm" id="audioStatus">%100</span>
                                 </div>
-                                <input 
-                                    type="range" 
-                                    min="0" 
-                                    max="100" 
-                                    value="50"
-                                    class="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                                    oninput="updateVolume(this.value)"
-                                >
+                                <div class="audio-visualizer">
+                                    <div id="audioLevel" class="audio-level" style="width: 0%"></div>
+                                </div>
+                                <div class="text-blue-200 text-xs mt-2 text-center">
+                                    Ses seviyesi otomatik ayarlanır
+                                </div>
                             </div>
 
                             <!-- Ses Testi -->
@@ -304,7 +427,7 @@
                                 onclick="toggleCamera()"
                                 class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
                             >
-                                <i class="fas fa-video"></i>
+                                <i class="fas fa-video-slash"></i>
                                 <span>Kamerayı Aç</span>
                             </button>
                         </div>
@@ -389,6 +512,27 @@
         let roomStartTime = null;
         let typingTimer = null;
         let isTyping = false;
+        let totalMessages = 0;
+        let activeDuration = 0;
+
+        // WebRTC Değişkenleri - GELİŞTİRİLDİ
+        let localStream = null;
+        let isAudioMuted = true;
+        let isVideoEnabled = false;
+        let isScreenSharing = false;
+        let screenStream = null;
+        let audioContext = null;
+        let analyser = null;
+        let audioLevelInterval = null;
+
+        // WebRTC Bağlantıları
+        let peerConnections = new Map();
+        const rtcConfiguration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
 
         // Tema değiştirme
         const themeToggle = document.getElementById('themeToggle');
@@ -448,7 +592,11 @@
                 });
                 
                 startRoomTimer();
+                startActiveDurationTimer();
                 showNotification(`${roomCode} odasına hoş geldiniz, ${userName}!`, 'success');
+                
+                // Medyayı başlatma
+                initializeMedia();
             } else {
                 window.location.href = '/';
             }
@@ -466,184 +614,417 @@
             });
         });
 
-        // Oda süresi sayacı
-        function startRoomTimer() {
-            roomStartTime = new Date();
-            let seconds = 0;
-            setInterval(() => {
-                seconds++;
-                const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = seconds % 60;
-                document.getElementById('roomDuration').textContent = 
-                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-            }, 1000);
+        // Medya akışını başlat
+        async function initializeMedia() {
+            try {
+                // Sadece ses context'i oluştur
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                showNotification('Mikrofonu açmak için mikrofon butonuna tıklayın', 'info');
+                
+                updateAudioButton();
+                updateGlobalMicStatus();
+                
+            } catch (error) {
+                console.error('Medya başlatma hatası:', error);
+                showNotification('Ses sistemi başlatılamadı', 'error');
+            }
         }
 
-        // Ses seviyesi güncelleme
-        function updateVolume(value) {
-            document.getElementById('volumeLevel').textContent = `%${value}`;
-        }
-
-        // Bağlantı durumu güncelleme
-        function updateConnectionStatus(connected) {
-            const statusElement = document.getElementById('connectionStatus');
-            const mobileStatusElement = document.getElementById('mobileConnectionStatus');
-            const icon = statusElement?.querySelector('i');
-            const mobileIcon = mobileStatusElement?.querySelector('i');
+        // Ses seviyesi monitörü
+        function startAudioLevelMonitor() {
+            if (!localStream) return;
             
-            if (connected) {
-                statusElement.className = 'hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
-                mobileStatusElement.className = 'flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
-                if (icon) icon.className = 'fas fa-wifi text-sm';
-                if (mobileIcon) mobileIcon.className = 'fas fa-wifi text-sm';
-                statusElement.querySelector('span').textContent = 'Bağlı';
-            } else {
-                statusElement.className = 'hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
-                mobileStatusElement.className = 'flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
-                if (icon) icon.className = 'fas fa-wifi-slash text-sm';
-                if (mobileIcon) mobileIcon.className = 'fas fa-wifi-slash text-sm';
-                statusElement.querySelector('span').textContent = 'Bağlantı Yok';
+            try {
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(localStream);
+                source.connect(analyser);
+                analyser.fftSize = 256;
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                audioLevelInterval = setInterval(() => {
+                    if (!localStream) {
+                        document.getElementById('audioLevel').style.width = '0%';
+                        return;
+                    }
+                    
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        sum += dataArray[i];
+                    }
+                    let average = sum / bufferLength;
+                    let level = Math.min(average / 128 * 100, 100);
+                    
+                    if (!isAudioMuted) {
+                        document.getElementById('audioLevel').style.width = level + '%';
+                    } else {
+                        document.getElementById('audioLevel').style.width = '0%';
+                    }
+                }, 100);
+            } catch (error) {
+                console.error('Ses seviyesi monitörü hatası:', error);
             }
         }
 
-        // Odadan ayrılma
-        function leaveRoom() {
-            if (confirm('Odadan çıkmak istediğinize emin misiniz?')) {
-                showNotification('Odadan ayrılıyorsunuz...', 'info');
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1000);
+        // Mikrofon kontrolü - WEBRTC ENTEGRE EDİLDİ
+        async function toggleMic() {
+            try {
+                if (!localStream) {
+                    // İlk kez tıklandığında mikrofon izni iste
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        },
+                        video: false
+                    });
+                    
+                    startAudioLevelMonitor();
+                    
+                    // Diğer kullanıcılara medya akışı başlattığını bildir
+                    socket.emit('start-media-stream', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasAudio: true,
+                        hasVideo: false
+                    });
+                }
+                
+                const audioTracks = localStream.getAudioTracks();
+                if (audioTracks.length > 0) {
+                    isAudioMuted = !isAudioMuted;
+                    audioTracks[0].enabled = !isAudioMuted;
+                    
+                    // Tüm peer connection'lara ses durumunu güncelle
+                    updateAudioTracksForAllPeers();
+                }
+                
+                updateAudioButton();
+                updateGlobalMicStatus();
+                
+                socket.emit('audio-state-change', { 
+                    isMuted: isAudioMuted,
+                    userName: document.getElementById('currentUserName').textContent
+                });
+                
+                showNotification(isAudioMuted ? 'Mikrofon kapatıldı 🔇' : 'Mikrofon açıldı 🎤', 'success');
+                
+            } catch (error) {
+                console.error('Mikrofon kontrol hatası:', error);
+                showNotification('Mikrofon erişimi reddedildi veya başarısız', 'error');
             }
         }
 
-        // Mikrofon kontrolü
-        function toggleMic() {
+        // Tüm peer connection'lara ses track'larını güncelle
+        function updateAudioTracksForAllPeers() {
+            const audioTracks = localStream.getAudioTracks();
+            
+            peerConnections.forEach((pc, socketId) => {
+                const senders = pc.getSenders();
+                const audioSender = senders.find(sender => 
+                    sender.track && sender.track.kind === 'audio'
+                );
+                
+                if (audioSender && audioTracks.length > 0) {
+                    audioSender.replaceTrack(audioTracks[0]);
+                }
+            });
+        }
+
+        // Ses butonunu güncelle
+        function updateAudioButton() {
             const micBtn = document.getElementById('micBtn');
             const icon = micBtn.querySelector('i');
             const text = micBtn.querySelector('span');
             
-            if (icon.classList.contains('fa-microphone-slash')) {
-                icon.className = 'fas fa-microphone';
-                text.textContent = 'Mikrofonu Kapat';
-                micBtn.classList.add('bg-green-500/20', 'border-green-400/30');
-                showNotification('Mikrofon açıldı', 'success');
-            } else {
+            if (isAudioMuted) {
                 icon.className = 'fas fa-microphone-slash';
                 text.textContent = 'Mikrofonu Aç';
-                micBtn.classList.remove('bg-green-500/20', 'border-green-400/30');
-                showNotification('Mikrofon kapatıldı', 'info');
+                micBtn.className = 'w-full bg-red-500/20 hover:bg-red-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-red-400/30';
+            } else {
+                icon.className = 'fas fa-microphone';
+                text.textContent = 'Mikrofonu Kapat';
+                micBtn.className = 'w-full bg-green-500/20 hover:bg-green-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-green-400/30';
             }
         }
 
-        // Kamera kontrolü
-        function toggleCamera() {
+        // Global mikrofon durumunu güncelle
+        function updateGlobalMicStatus() {
+            const globalStatus = document.getElementById('globalMicStatus');
+            const mobileStatus = document.getElementById('mobileMicStatus');
+            const globalIcon = globalStatus?.querySelector('i');
+            const mobileIcon = mobileStatus?.querySelector('i');
+            const globalText = globalStatus?.querySelector('span');
+            
+            if (isAudioMuted) {
+                if (globalStatus) {
+                    globalStatus.className = 'hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                    globalIcon.className = 'fas fa-microphone-slash text-sm';
+                    globalText.textContent = 'Sessiz';
+                }
+                if (mobileStatus) {
+                    mobileStatus.className = 'flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                    mobileIcon.className = 'fas fa-microphone-slash text-sm';
+                }
+            } else {
+                if (globalStatus) {
+                    globalStatus.className = 'hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                    globalIcon.className = 'fas fa-microphone text-sm';
+                    globalText.textContent = 'Açık';
+                }
+                if (mobileStatus) {
+                    mobileStatus.className = 'flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                    mobileIcon.className = 'fas fa-microphone text-sm';
+                }
+            }
+        }
+
+        // Kamera kontrolü - WEBRTC ENTEGRE EDİLDİ
+        async function toggleCamera() {
+            try {
+                if (isScreenSharing) {
+                    showNotification('Ekran paylaşımı sırasında kamera açılamaz', 'error');
+                    return;
+                }
+                
+                if (!isVideoEnabled) {
+                    // Kamera aç
+                    const videoStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: 1280,
+                            height: 720
+                        }
+                    });
+                    
+                    // Local stream'e video track ekle
+                    if (localStream) {
+                        const videoTracks = videoStream.getVideoTracks();
+                        if (videoTracks.length > 0) {
+                            localStream.addTrack(videoTracks[0]);
+                        }
+                    } else {
+                        localStream = videoStream;
+                    }
+                    
+                    createVideoElement(socket.id, localStream, true, 'Kamera');
+                    isVideoEnabled = true;
+                    
+                    // Diğer kullanıcılara video başlattığını bildir
+                    socket.emit('start-media-stream', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasAudio: !isAudioMuted,
+                        hasVideo: true
+                    });
+                } else {
+                    // Kamera kapat
+                    const videoTracks = localStream.getVideoTracks();
+                    if (videoTracks.length > 0) {
+                        videoTracks.forEach(track => track.stop());
+                        localStream.removeTrack(videoTracks[0]);
+                    }
+                    
+                    const videoElement = document.getElementById(`video-${socket.id}`);
+                    if (videoElement) {
+                        videoElement.remove();
+                    }
+                    isVideoEnabled = false;
+                }
+                
+                updateCameraButton();
+                showNotification(isVideoEnabled ? 'Kamera açıldı' : 'Kamera kapatıldı', 'success');
+                
+            } catch (error) {
+                console.error('Kamera kontrol hatası:', error);
+                showNotification('Kamera erişimi başarısız', 'error');
+            }
+        }
+
+        // Kamera butonunu güncelle
+        function updateCameraButton() {
             const cameraBtn = document.getElementById('cameraBtn');
             const icon = cameraBtn.querySelector('i');
             const text = cameraBtn.querySelector('span');
             
-            if (icon.classList.contains('fa-video')) {
-                icon.className = 'fas fa-video-slash';
-                text.textContent = 'Kamerayı Aç';
-                cameraBtn.classList.remove('bg-green-500/20', 'border-green-400/30');
-                showNotification('Kamera kapatıldı', 'info');
-            } else {
+            if (isVideoEnabled) {
                 icon.className = 'fas fa-video';
                 text.textContent = 'Kamerayı Kapat';
-                cameraBtn.classList.add('bg-green-500/20', 'border-green-400/30');
-                showNotification('Kamera açıldı', 'success');
+                cameraBtn.className = 'w-full bg-green-500/20 hover:bg-green-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-green-400/30';
+            } else {
+                icon.className = 'fas fa-video-slash';
+                text.textContent = 'Kamerayı Aç';
+                cameraBtn.className = 'w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20';
             }
         }
 
         // Ekran paylaşımı
-        function toggleScreenShare() {
+        async function toggleScreenShare() {
+            try {
+                if (isScreenSharing) {
+                    screenStream.getTracks().forEach(track => track.stop());
+                    isScreenSharing = false;
+                    screenStream = null;
+                    
+                    const screenElement = document.getElementById(`video-${socket.id}-screen`);
+                    if (screenElement) {
+                        screenElement.remove();
+                    }
+                    
+                    updateScreenShareButton();
+                    showNotification('Ekran paylaşımı durduruldu', 'success');
+                    
+                    socket.emit('screen-share-stopped', {
+                        userName: document.getElementById('currentUserName').textContent
+                    });
+                } else {
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,
+                        audio: true
+                    });
+                    
+                    isScreenSharing = true;
+                    createVideoElement(socket.id + '-screen', screenStream, true, 'Ekran Paylaşımı');
+                    
+                    screenStream.getTracks().forEach(track => {
+                        track.onended = () => {
+                            toggleScreenShare();
+                        };
+                    });
+                    
+                    updateScreenShareButton();
+                    showNotification('Ekran paylaşımı başlatıldı', 'success');
+                    
+                    socket.emit('screen-share-started', {
+                        userName: document.getElementById('currentUserName').textContent
+                    });
+                }
+            } catch (error) {
+                console.error('Ekran paylaşımı hatası:', error);
+                showNotification('Ekran paylaşımı başarısız', 'error');
+            }
+        }
+
+        // Ekran paylaşım butonunu güncelle
+        function updateScreenShareButton() {
             const screenBtn = document.getElementById('screenBtn');
             const icon = screenBtn.querySelector('i');
             const text = screenBtn.querySelector('span');
             
-            if (icon.classList.contains('fa-desktop')) {
+            if (isScreenSharing) {
                 icon.className = 'fas fa-stop';
                 text.textContent = 'Paylaşımı Durdur';
-                screenBtn.classList.add('bg-purple-500/20', 'border-purple-400/30');
-                showNotification('Ekran paylaşımı başlatıldı', 'success');
+                screenBtn.className = 'w-full bg-red-500/20 hover:bg-red-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-red-400/30';
             } else {
                 icon.className = 'fas fa-desktop';
                 text.textContent = 'Ekran Paylaş';
-                screenBtn.classList.remove('bg-purple-500/20', 'border-purple-400/30');
-                showNotification('Ekran paylaşımı durduruldu', 'info');
+                screenBtn.className = 'w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20';
             }
         }
 
-        // Dosya paylaşımı
-        function shareFile() {
-            showNotification('Dosya paylaşım özelliği yakında eklenecek!', 'info');
-        }
-
-        // Ses testi
-        function testAudio() {
-            showNotification('Ses testi çalıştırılıyor...', 'info');
-        }
-
-        // Oda kodunu kopyala
-        function copyRoomCode() {
-            const roomCode = document.getElementById('currentRoomCode').textContent;
-            navigator.clipboard.writeText(roomCode).then(() => {
-                showNotification('Oda kodu panoya kopyalandı!', 'success');
-            });
-        }
-
-        // Kullanıcı davet et
-        function inviteUsers() {
-            const roomCode = document.getElementById('currentRoomCode').textContent;
-            const inviteText = `SyncVibe odasına katılın! Oda Kodu: ${roomCode}\n${window.location.origin}?code=${roomCode}`;
+        // Video elementi oluştur
+        function createVideoElement(userId, stream, isLocal = false, title = '') {
+            const videoGrid = document.getElementById('videoGrid');
+            let videoContainer = document.getElementById(`video-${userId}`);
             
-            if (navigator.share) {
-                navigator.share({
-                    title: 'SyncVibe Davet',
-                    text: inviteText
-                });
-            } else {
-                navigator.clipboard.writeText(inviteText).then(() => {
-                    showNotification('Davet bağlantısı panoya kopyalandı!', 'success');
-                });
-            }
-        }
-
-        // Tam ekran
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    showNotification('Tam ekran hatası: ' + err.message, 'error');
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        // Kısayollar
-        function showShortcuts() {
-            const shortcuts = [
-                'Enter: Mesaj gönder',
-                'Ctrl+Enter: Yeni satır',
-                'Ctrl+K: Odadan ayrıl',
-                'Ctrl+M: Mikrofon aç/kapa',
-                'Ctrl+E: Ekran paylaş'
-            ];
-            
-            showNotification(shortcuts.join(' | '), 'info');
-        }
-
-        // Yazma indikatörü
-        function handleTyping() {
-            if (!isTyping) {
-                isTyping = true;
-                socket.emit('typing-start');
+            if (!videoContainer) {
+                videoContainer = document.createElement('div');
+                videoContainer.id = `video-${userId}`;
+                videoContainer.className = 'video-container';
+                
+                const videoElement = document.createElement('video');
+                videoElement.id = `video-element-${userId}`;
+                videoElement.className = 'video-element';
+                videoElement.autoplay = true;
+                videoElement.muted = isLocal;
+                videoElement.playsInline = true;
+                
+                const overlay = document.createElement('div');
+                overlay.className = 'video-overlay';
+                overlay.innerHTML = `
+                    <i class="fas ${isLocal ? 'fa-user' : 'fa-user-friends'} mr-1"></i>
+                    ${title || (isLocal ? 'Siz' : 'Kullanıcı')}
+                `;
+                
+                // Ses indikatörü
+                const audioIndicator = document.createElement('div');
+                audioIndicator.className = `audio-indicator ${isLocal ? (isAudioMuted ? 'audio-muted' : 'audio-speaking') : 'audio-muted'}`;
+                audioIndicator.innerHTML = '<i class="fas fa-microphone text-xs text-white"></i>';
+                
+                videoContainer.appendChild(videoElement);
+                videoContainer.appendChild(overlay);
+                videoContainer.appendChild(audioIndicator);
+                videoGrid.appendChild(videoContainer);
             }
             
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                isTyping = false;
-                socket.emit('typing-stop');
-            }, 1000);
+            const videoElement = document.getElementById(`video-element-${userId}`);
+            videoElement.srcObject = stream;
+        }
+
+        // WEBRTC FONKSİYONLARI - EKLENDİ
+
+        // Yeni bir kullanıcı için WebRTC bağlantısı oluştur
+        async function createPeerConnection(targetSocketId, userName) {
+            console.log('Yeni WebRTC bağlantısı oluşturuluyor:', targetSocketId);
+            
+            const peerConnection = new RTCPeerConnection(rtcConfiguration);
+            
+            // Local stream'i ekle
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    if (track.kind === 'audio' && !isAudioMuted) {
+                        peerConnection.addTrack(track, localStream);
+                    } else if (track.kind === 'video' && isVideoEnabled) {
+                        peerConnection.addTrack(track, localStream);
+                    }
+                });
+            }
+            
+            // Remote stream geldiğinde
+            peerConnection.ontrack = (event) => {
+                console.log('Remote stream alındı:', targetSocketId);
+                const [remoteStream] = event.streams;
+                createVideoElement(targetSocketId, remoteStream, false, userName);
+            };
+            
+            // ICE candidate oluşturulduğunda
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('webrtc-ice-candidate', {
+                        targetSocketId: targetSocketId,
+                        candidate: event.candidate,
+                        userName: document.getElementById('currentUserName').textContent
+                    });
+                }
+            };
+            
+            // Bağlantı durumu değiştiğinde
+            peerConnection.onconnectionstatechange = () => {
+                console.log(`WebRTC bağlantı durumu (${targetSocketId}):`, peerConnection.connectionState);
+            };
+            
+            peerConnections.set(targetSocketId, peerConnection);
+            return peerConnection;
+        }
+
+        // Offer oluştur ve gönder
+        async function createAndSendOffer(targetSocketId, userName) {
+            try {
+                const peerConnection = await createPeerConnection(targetSocketId, userName);
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                socket.emit('webrtc-offer', {
+                    targetSocketId: targetSocketId,
+                    offer: offer,
+                    userName: document.getElementById('currentUserName').textContent
+                });
+                
+                console.log('WebRTC offer gönderildi:', targetSocketId);
+            } catch (error) {
+                console.error('Offer oluşturma hatası:', error);
+            }
         }
 
         // Mesaj gönderme
@@ -651,108 +1032,396 @@
             const messageInput = document.getElementById('messageInput');
             const message = messageInput.value.trim();
             
-            if (message) {
-                socket.emit('send-message', {
-                    text: message,
-                    timestamp: new Date().toISOString()
+            if (message === '') return;
+            
+            const userName = document.getElementById('currentUserName').textContent;
+            const timestamp = new Date().toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            addMessageToChat(userName, message, timestamp, true);
+            
+            socket.emit('send-message', {
+                userName: userName,
+                message: message,
+                timestamp: timestamp
+            });
+            
+            messageInput.value = '';
+            document.getElementById('charCount').textContent = '0';
+            
+            clearTyping();
+            
+            totalMessages++;
+            document.getElementById('totalMessages').textContent = totalMessages;
+        }
+
+        // Mesajı sohbete ekle
+        function addMessageToChat(userName, message, timestamp, isOwn = false, isSystem = false) {
+            const messagesContainer = document.getElementById('messages');
+            
+            const emptyState = messagesContainer.querySelector('.text-center');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            const messageElement = document.createElement('div');
+            
+            if (isSystem) {
+                messageElement.className = 'system-message';
+                messageElement.innerHTML = `
+                    <div class="text-blue-200 text-sm italic">
+                        <span>${message}</span>
+                        <span class="text-xs ml-2">${timestamp}</span>
+                    </div>
+                `;
+            } else {
+                messageElement.className = `flex ${isOwn ? 'justify-end' : 'justify-start'}`;
+                messageElement.innerHTML = `
+                    <div class="max-w-xs lg:max-w-md ${isOwn ? 'bg-blue-500/20' : 'bg-white/10'} rounded-2xl p-4 backdrop-blur-sm border ${isOwn ? 'border-blue-400/30' : 'border-white/20'}">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-semibold text-white text-sm">${isOwn ? 'Siz' : userName}</span>
+                            <span class="text-blue-200 text-xs">${timestamp}</span>
+                        </div>
+                        <p class="text-white text-sm">${message}</p>
+                    </div>
+                `;
+            }
+            
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Yazıyor durumu
+        function handleTyping() {
+            if (!isTyping) {
+                isTyping = true;
+                socket.emit('typing-start', {
+                    userName: document.getElementById('currentUserName').textContent
                 });
-                messageInput.value = '';
-                document.getElementById('charCount').textContent = '0';
-                
-                // Yazma durdur
-                if (isTyping) {
-                    isTyping = false;
-                    socket.emit('typing-stop');
+            }
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                isTyping = false;
+                socket.emit('typing-stop', {
+                    userName: document.getElementById('currentUserName').textContent
+                });
+            }, 1000);
+        }
+
+        // Yazıyor durumunu temizle
+        function clearTyping() {
+            isTyping = false;
+            socket.emit('typing-stop', {
+                userName: document.getElementById('currentUserName').textContent
+            });
+        }
+
+        // Bağlantı durumunu güncelle
+        function updateConnectionStatus(isConnected) {
+            const connectionStatus = document.getElementById('connectionStatus');
+            const mobileConnectionStatus = document.getElementById('mobileConnectionStatus');
+            
+            if (isConnected) {
+                if (connectionStatus) {
+                    connectionStatus.className = 'hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                    connectionStatus.querySelector('i').className = 'fas fa-wifi text-sm';
+                    connectionStatus.querySelector('span').textContent = 'Bağlı';
+                }
+                if (mobileConnectionStatus) {
+                    mobileConnectionStatus.className = 'flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2';
+                    mobileConnectionStatus.querySelector('i').className = 'fas fa-wifi text-sm';
+                }
+            } else {
+                if (connectionStatus) {
+                    connectionStatus.className = 'hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                    connectionStatus.querySelector('i').className = 'fas fa-wifi text-sm';
+                    connectionStatus.querySelector('span').textContent = 'Bağlantı Yok';
+                }
+                if (mobileConnectionStatus) {
+                    mobileConnectionStatus.className = 'flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2';
+                    mobileConnectionStatus.querySelector('i').className = 'fas fa-wifi text-sm';
                 }
             }
         }
 
-        // Enter tuşu ile mesaj gönderme
-        document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Bildirim gösterme fonksiyonu
-        function showNotification(message, type = 'info') {
-            const notification = document.getElementById('notification');
-            const text = document.getElementById('notificationText');
-            const icon = notification.querySelector('i');
+        // Oda süresi
+        function startRoomTimer() {
+            roomStartTime = new Date();
             
-            notification.className = 'fixed top-4 right-4 glass rounded-xl p-4 text-white z-50 transform transition-all duration-300';
-            
-            if (type === 'error') {
-                notification.classList.add('bg-red-500/80');
-                icon.className = 'fas fa-exclamation-circle mr-3 text-lg';
-            } else if (type === 'success') {
-                notification.classList.add('bg-green-500/80');
-                icon.className = 'fas fa-check-circle mr-3 text-lg';
-            } else {
-                notification.classList.add('bg-blue-500/80');
-                icon.className = 'fas fa-info-circle mr-3 text-lg';
-            }
-            
-            text.textContent = message;
-            notification.classList.remove('hidden', 'opacity-0', 'translate-x-full');
-            notification.classList.add('opacity-100', 'translate-x-0');
-            
-            setTimeout(() => {
-                notification.classList.add('opacity-0', 'translate-x-full');
-                setTimeout(() => notification.classList.add('hidden'), 300);
-            }, 4000);
+            setInterval(() => {
+                if (roomStartTime) {
+                    const now = new Date();
+                    const diff = Math.floor((now - roomStartTime) / 1000);
+                    const minutes = Math.floor(diff / 60);
+                    const seconds = diff % 60;
+                    
+                    document.getElementById('roomDuration').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
         }
 
-        // Socket event listener'ları
-        socket.on('new-message', (messageData) => {
-            const messagesDiv = document.getElementById('messages');
-            const messageElement = document.createElement('div');
+        // Aktif süre
+        function startActiveDurationTimer() {
+            setInterval(() => {
+                activeDuration++;
+                const minutes = Math.floor(activeDuration / 60);
+                const seconds = activeDuration % 60;
+                document.getElementById('activeDuration').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        // Bildirim göster
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
             
-            if (messageData.type === 'system') {
-                messageElement.className = 'text-center py-2';
-                messageElement.innerHTML = `
-                    <span class="bg-white/10 text-blue-200 text-sm px-3 py-1 rounded-full backdrop-blur-sm">
-                        <i class="fas fa-info-circle mr-2"></i>${messageData.text}
-                    </span>
-                `;
-            } else {
-                const isOwnMessage = messageData.userId === socket.id;
-                messageElement.className = `bg-white/10 rounded-2xl p-4 backdrop-blur-sm ${isOwnMessage ? 'border-l-4 border-blue-400' : ''}`;
-                messageElement.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="font-semibold text-white ${isOwnMessage ? 'text-blue-300' : ''}">
-                            ${messageData.user}
-                            ${isOwnMessage ? ' <i class="fas fa-user text-xs"></i>' : ''}
-                        </span>
-                        <span class="text-blue-200 text-sm">${messageData.timestamp}</span>
-                    </div>
-                    <p class="text-white">${messageData.text}</p>
-                `;
+            notificationText.textContent = message;
+            
+            notification.className = notification.className.replace(/bg-(red|green|blue|yellow)-500\/20/g, '');
+            
+            switch(type) {
+                case 'success':
+                    notification.classList.add('bg-green-500/20', 'border-green-400/30');
+                    break;
+                case 'error':
+                    notification.classList.add('bg-red-500/20', 'border-red-400/30');
+                    break;
+                case 'warning':
+                    notification.classList.add('bg-yellow-500/20', 'border-yellow-400/30');
+                    break;
+                default:
+                    notification.classList.add('bg-blue-500/20', 'border-blue-400/30');
             }
             
-            messagesDiv.appendChild(messageElement);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            notification.classList.remove('hidden', 'opacity-0', 'translate-y-2');
+            notification.classList.add('flex', 'opacity-100', 'translate-y-0');
             
-            // İlk mesajda hoş geldin mesajını kaldır
-            const welcomeMessage = messagesDiv.querySelector('.text-center');
-            if (welcomeMessage && messageData.type !== 'system') {
-                welcomeMessage.remove();
+            setTimeout(() => {
+                notification.classList.remove('opacity-100', 'translate-y-0');
+                notification.classList.add('opacity-0', 'translate-y-2');
+                
+                setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+
+        // Oda bilgilerini güncelle
+        function updateRoomInfo() {
+            const now = new Date();
+            document.getElementById('roomCreated').textContent = now.toLocaleTimeString('tr-TR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Yardımcı fonksiyonlar
+        function copyRoomCode() {
+            const roomCode = document.getElementById('currentRoomCode').textContent;
+            navigator.clipboard.writeText(roomCode).then(() => {
+                showNotification('Oda kodu panoya kopyalandı!', 'success');
+            });
+        }
+
+        function inviteUsers() {
+            const roomCode = document.getElementById('currentRoomCode').textContent;
+            const inviteText = `SyncVibe odasına katılın! Oda kodu: ${roomCode}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'SyncVibe Davet',
+                    text: inviteText,
+                    url: window.location.href
+                });
+            } else {
+                navigator.clipboard.writeText(inviteText).then(() => {
+                    showNotification('Davet metni panoya kopyalandı!', 'success');
+                });
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error('Tam ekran hatası:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function showShortcuts() {
+            showNotification('Kısayollar: Enter - Mesaj gönder, Ctrl+M - Mikrofon, Ctrl+S - Ekran paylaşımı', 'info');
+        }
+
+        function testAudio() {
+            showNotification('Ses testi başlatıldı', 'info');
+        }
+
+        function shareFile() {
+            showNotification('Dosya paylaşımı yakında eklenecek', 'info');
+        }
+
+        function leaveRoom() {
+            if (confirm('Odadan ayrılmak istediğinizden emin misiniz?')) {
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                }
+                if (screenStream) {
+                    screenStream.getTracks().forEach(track => track.stop());
+                }
+                if (audioLevelInterval) {
+                    clearInterval(audioLevelInterval);
+                }
+                
+                // Tüm WebRTC bağlantılarını kapat
+                peerConnections.forEach(pc => pc.close());
+                peerConnections.clear();
+                
+                socket.disconnect();
+                window.location.href = '/';
+            }
+        }
+
+        // SOCKET EVENT LISTENER'LARI - WEBRTC EKLENDİ
+
+        // WebRTC Offer alma
+        socket.on('webrtc-offer', async (data) => {
+            console.log('WebRTC offer alındı:', data.fromSocketId);
+            try {
+                const peerConnection = await createPeerConnection(data.fromSocketId, data.userName);
+                await peerConnection.setRemoteDescription(data.offer);
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.emit('webrtc-answer', {
+                    targetSocketId: data.fromSocketId,
+                    answer: answer,
+                    userName: document.getElementById('currentUserName').textContent
+                });
+            } catch (error) {
+                console.error('Offer işleme hatası:', error);
             }
         });
 
-        socket.on('update-participants', (users) => {
+        // WebRTC Answer alma
+        socket.on('webrtc-answer', async (data) => {
+            console.log('WebRTC answer alındı:', data.fromSocketId);
+            const peerConnection = peerConnections.get(data.fromSocketId);
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(data.answer);
+            }
+        });
+
+        // WebRTC ICE Candidate alma
+        socket.on('webrtc-ice-candidate', async (data) => {
+            console.log('WebRTC ICE candidate alındı:', data.fromSocketId);
+            const peerConnection = peerConnections.get(data.fromSocketId);
+            if (peerConnection) {
+                await peerConnection.addIceCandidate(data.candidate);
+            }
+        });
+
+        // Kullanıcı medya başlattığında WebRTC bağlantısı kur
+        socket.on('user-started-media', (data) => {
+            console.log('Kullanıcı medya başlattı:', data.socketId);
+            if (data.socketId !== socket.id) {
+                createAndSendOffer(data.socketId, data.userName);
+            }
+        });
+
+        // Mesaj alma
+        socket.on('receive-message', (data) => {
+            if (data.type === 'system') {
+                addMessageToChat(data.userName, data.message, data.timestamp, false, true);
+            } else {
+                if (data.userName !== document.getElementById('currentUserName').textContent) {
+                    addMessageToChat(data.userName, data.message, data.timestamp, false, false);
+                    totalMessages++;
+                    document.getElementById('totalMessages').textContent = totalMessages;
+                }
+            }
+        });
+
+        // Katılımcı listesi güncelleme
+        socket.on('update-participants', (participants) => {
+            updateParticipantList(participants);
+        });
+
+        // Kullanıcı katılma
+        socket.on('user-joined', (data) => {
+            showNotification(`${data.userName} odaya katıldı`, 'success');
+        });
+
+        // Kullanıcı ayrılma
+        socket.on('user-left', (data) => {
+            showNotification(`${data.userName} odadan ayrıldı`, 'info');
+            
+            // WebRTC bağlantısını temizle
+            const peerConnection = peerConnections.get(data.userId);
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnections.delete(data.userId);
+            }
+            
+            // Video elementini kaldır
+            const videoElement = document.getElementById(`video-${data.userId}`);
+            if (videoElement) {
+                videoElement.remove();
+            }
+        });
+
+        // Yazıyor indikatörü
+        socket.on('user-typing-start', (data) => {
+            const typingIndicator = document.getElementById('typingIndicator');
+            const typingUsers = document.getElementById('typingUsers');
+            
+            typingIndicator.classList.remove('hidden');
+            typingUsers.textContent = `${data.userName} yazıyor...`;
+        });
+
+        socket.on('user-typing-stop', () => {
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.classList.add('hidden');
+        });
+
+        // Ses durumu değişikliği
+        socket.on('audio-state-changed', (data) => {
+            updateParticipantAudioStatus(data.userId, data.isMuted);
+            
+            // Video elementindeki ses indikatörünü güncelle
+            const audioIndicator = document.querySelector(`#video-${data.userId} .audio-indicator`);
+            if (audioIndicator) {
+                if (data.isMuted) {
+                    audioIndicator.className = 'audio-indicator audio-muted';
+                } else {
+                    audioIndicator.className = 'audio-indicator audio-speaking';
+                }
+            }
+        });
+
+        // Odaya başarıyla katılma
+        socket.on('room-joined', (data) => {
+            console.log('Odaya katıldı:', data);
+            updateParticipantList(data.participants);
+        });
+
+        // Katılımcı listesini güncelle
+        function updateParticipantList(participants) {
             const participantsList = document.getElementById('participantsList');
-            const participantCount = document.getElementById('participantCount');
-            const mobileParticipantCount = document.getElementById('mobileParticipantCount');
-            const participantCountBadge = document.getElementById('participantCountBadge');
+            const participantCount = participants.length;
             
-            participantsList.innerHTML = '';
-            participantCount.textContent = users.length;
-            mobileParticipantCount.textContent = users.length;
-            participantCountBadge.textContent = users.length;
+            document.getElementById('participantCount').textContent = participantCount;
+            document.getElementById('mobileParticipantCount').textContent = participantCount;
+            document.getElementById('participantCountBadge').textContent = participantCount;
             
-            if (users.length === 0) {
+            if (participantCount === 0) {
                 participantsList.innerHTML = `
                     <div class="text-center py-8">
                         <i class="fas fa-users text-2xl text-white/50 mb-3"></i>
@@ -762,79 +1431,76 @@
                 return;
             }
             
-            users.forEach(user => {
+            participantsList.innerHTML = '';
+            participants.forEach(participant => {
                 const participantElement = document.createElement('div');
-                participantElement.className = 'flex items-center p-3 bg-white/10 rounded-xl backdrop-blur-sm';
+                participantElement.className = `flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 participant-item ${participant.isMuted ? 'participant-muted' : ''}`;
                 participantElement.innerHTML = `
-                    <div class="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full mr-3">
-                        <i class="fas fa-user text-white text-sm"></i>
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-medium text-white text-sm flex items-center">
-                            ${user.name}
-                            ${user.isHost ? ' <span class="ml-2 bg-yellow-500/20 text-yellow-200 text-xs px-2 py-0.5 rounded">Host</span>' : ''}
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                            ${participant.name.charAt(0).toUpperCase()}
                         </div>
-                        <div class="text-blue-200 text-xs">${user.id.substring(0, 8)}</div>
+                        <div>
+                            <p class="text-white font-medium text-sm">${participant.name}</p>
+                            <p class="text-blue-200 text-xs">${participant.isMuted ? 'Sessiz' : 'Konuşuyor'}</p>
+                        </div>
                     </div>
-                    <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <div class="flex items-center space-x-2">
+                        <i class="fas ${participant.isMuted ? 'fa-microphone-slash text-red-400' : 'fa-microphone text-green-400'} text-sm"></i>
+                    </div>
                 `;
                 participantsList.appendChild(participantElement);
             });
-        });
+        }
 
-        // Odaya katıldığında
-        socket.on('room-joined', (data) => {
-            const roomCreatedTime = new Date(data.roomCreatedAt).toLocaleTimeString('tr-TR', {
-                hour: '2-digit',
-                minute: '2-digit'
+        // Katılımcı ses durumunu güncelle
+        function updateParticipantAudioStatus(userId, isMuted) {
+            const participantItems = document.querySelectorAll('.participant-item');
+            participantItems.forEach(item => {
+                const userNameElement = item.querySelector('.text-white');
+                if (userNameElement) {
+                    const participantElement = item;
+                    const icon = item.querySelector('.fa-microphone, .fa-microphone-slash');
+                    const statusText = item.querySelector('.text-blue-200');
+                    
+                    if (isMuted) {
+                        participantElement.classList.add('participant-muted');
+                        icon.className = 'fas fa-microphone-slash text-red-400 text-sm';
+                        statusText.textContent = 'Sessiz';
+                    } else {
+                        participantElement.classList.remove('participant-muted');
+                        icon.className = 'fas fa-microphone text-green-400 text-sm';
+                        statusText.textContent = 'Konuşuyor';
+                    }
+                }
             });
-            document.getElementById('roomCreated').textContent = roomCreatedTime;
-            
-            showNotification(`${data.roomCode} odasına başarıyla katıldınız`, 'success');
-        });
+        }
 
-        // Kullanıcı katıldı/ayrıldı
-        socket.on('user-joined', (user) => {
-            showNotification(`${user.name} odaya katıldı`, 'info');
-        });
-
-        socket.on('user-left', (user) => {
-            showNotification(`${user.name} odadan ayrıldı`, 'info');
-        });
-
-        // Klavye kısayolları
-        document.addEventListener('keydown', function(e) {
-            // Ctrl+K - Odadan ayrıl
-            if (e.ctrlKey && e.key === 'k') {
-                e.preventDefault();
-                leaveRoom();
-            }
-            
-            // Ctrl+M - Mikrofon aç/kapa
-            if (e.ctrlKey && e.key === 'm') {
-                e.preventDefault();
-                toggleMic();
-            }
-            
-            // Ctrl+E - Ekran paylaş
-            if (e.ctrlKey && e.key === 'e') {
-                e.preventDefault();
-                toggleScreenShare();
-            }
-            
-            // Escape - Tam ekrandan çık
-            if (e.key === 'Escape' && document.fullscreenElement) {
-                document.exitFullscreen();
+        // Enter tuşu ile mesaj gönderme
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
         });
 
-        // Sayfa kapatma uyarısı
-        window.addEventListener('beforeunload', function(e) {
-            if (document.getElementById('participantCount').textContent !== '0') {
-                e.preventDefault();
-                e.returnValue = 'Odadan ayrılmak istediğinize emin misiniz?';
+        // Sayfa kapatma/kullanıcı ayrılma
+        window.addEventListener('beforeunload', function() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
             }
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+            }
+            if (audioLevelInterval) {
+                clearInterval(audioLevelInterval);
+            }
+            
+            peerConnections.forEach(pc => pc.close());
+            socket.disconnect();
         });
+
+        // Başlangıçta oda bilgilerini güncelle
+        updateRoomInfo();
     </script>
 </body>
 </html>

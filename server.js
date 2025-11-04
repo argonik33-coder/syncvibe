@@ -1,4 +1,4 @@
-// server.js - Render için optimize edilmiş
+// server.js - WEBRTC SİNYAL SUNUCUSU EKLENDİ
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -9,13 +9,13 @@ const rateLimit = require('express-rate-limit');
 const sanitizeHtml = require('sanitize-html');
 
 // Render-specific configuration
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV || 'development';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io konfigürasyonu - Render için optimize
+// Socket.io konfigürasyonu
 const io = socketIo(server, {
   cors: {
     origin: isProduction ? false : "*",
@@ -251,7 +251,7 @@ io.on('connection', (socket) => {
     socket.emit('room-exists', { exists: exists });
   });
 
-  // Yeni oda oluşturma - DÜZELTİLMİŞ
+  // Yeni oda oluşturma
   socket.on('create-room', (userData) => {
     if (!checkSocketRateLimit(socket)) {
       socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
@@ -260,7 +260,6 @@ io.on('connection', (socket) => {
 
     userSessions.get(socket.id).lastActivity = new Date();
     
-    // SADECE KULLANICI ADI VALIDATION
     if (!userData || !userData.name || typeof userData.name !== 'string') {
       socket.emit('error', 'Kullanıcı adı gereklidir');
       return;
@@ -368,7 +367,7 @@ io.on('connection', (socket) => {
       name: userName,
       joinedAt: new Date(),
       isHost: room.users.length === 0,
-      isMuted: false,
+      isMuted: true,
       isSpeaking: false,
       lastSeen: new Date()
     };
@@ -385,15 +384,18 @@ io.on('connection', (socket) => {
       participants: room.users
     });
     
-    socket.to(roomCode).emit('user-joined', user);
+    socket.to(roomCode).emit('user-joined', {
+      userName: user.name,
+      participants: room.users
+    });
+    
     io.to(roomCode).emit('update-participants', room.users);
     
-    io.to(roomCode).emit('new-message', {
-      user: 'Sistem',
-      text: `${user.name} odaya katıldı`,
+    socket.to(roomCode).emit('receive-message', {
+      userName: 'Sistem',
+      message: `${user.name} odaya katıldı`,
       timestamp: new Date().toLocaleTimeString('tr-TR'),
-      type: 'system',
-      messageId: generateMessageId()
+      type: 'system'
     });
     
     console.log('Kullanıcı odaya katıldı:', user.name, 'Oda:', roomCode);
@@ -410,7 +412,7 @@ io.on('connection', (socket) => {
 
     userSessions.get(socket.id).lastActivity = new Date();
     
-    const messageValidation = validateMessage(messageData.text);
+    const messageValidation = validateMessage(messageData.message);
     if (!messageValidation.isValid) {
       socket.emit('error', messageValidation.error);
       return;
@@ -422,22 +424,112 @@ io.on('connection', (socket) => {
       
       if (user) {
         const message = {
-          user: user.name,
-          text: messageValidation.sanitizedText,
-          timestamp: new Date().toLocaleTimeString('tr-TR'),
-          type: 'user',
-          userId: socket.id,
-          messageId: generateMessageId(),
-          timestampISO: new Date().toISOString()
+          userName: user.name,
+          message: messageValidation.sanitizedText,
+          timestamp: messageData.timestamp || new Date().toLocaleTimeString('tr-TR'),
+          type: 'user'
         };
         
         room.stats.totalMessages++;
         room.lastActivity = new Date();
         
-        io.to(socket.roomCode).emit('new-message', message);
+        socket.to(socket.roomCode).emit('receive-message', message);
         
-        console.log('Yeni mesaj:', user.name, '-', message.text.substring(0, 50));
+        console.log('Yeni mesaj:', user.name, '-', message.message.substring(0, 50));
       }
+    }
+  });
+
+  // WEBRTC SİNYALLEŞME - EKLENDİ
+  socket.on('webrtc-offer', (data) => {
+    console.log('WebRTC offer alındı:', data.targetSocketId);
+    socket.to(data.targetSocketId).emit('webrtc-offer', {
+      offer: data.offer,
+      fromSocketId: socket.id,
+      userName: data.userName
+    });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    console.log('WebRTC answer alındı:', data.targetSocketId);
+    socket.to(data.targetSocketId).emit('webrtc-answer', {
+      answer: data.answer,
+      fromSocketId: socket.id,
+      userName: data.userName
+    });
+  });
+
+  socket.on('webrtc-ice-candidate', (data) => {
+    console.log('WebRTC ICE candidate alındı:', data.targetSocketId);
+    socket.to(data.targetSocketId).emit('webrtc-ice-candidate', {
+      candidate: data.candidate,
+      fromSocketId: socket.id,
+      userName: data.userName
+    });
+  });
+
+  // Oda içindeki tüm kullanıcılara ses/video başlatma sinyali gönder
+  socket.on('start-media-stream', (data) => {
+    if (socket.roomCode) {
+      console.log('Medya akışı başlatma sinyali:', socket.id);
+      socket.to(socket.roomCode).emit('user-started-media', {
+        socketId: socket.id,
+        userName: data.userName,
+        hasAudio: data.hasAudio,
+        hasVideo: data.hasVideo
+      });
+    }
+  });
+
+  // Yazıyor indikatörü
+  socket.on('typing-start', (data) => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('user-typing-start', data);
+    }
+  });
+
+  socket.on('typing-stop', (data) => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('user-typing-stop', data);
+    }
+  });
+
+  // Ses durumu güncelleme
+  socket.on('audio-state-change', (data) => {
+    if (socket.roomCode) {
+      const room = rooms.get(socket.roomCode);
+      if (room) {
+        const user = room.users.find(u => u.id === socket.id);
+        if (user) {
+          user.isMuted = data.isMuted;
+          io.to(socket.roomCode).emit('update-participants', room.users);
+        }
+      }
+      
+      socket.to(socket.roomCode).emit('audio-state-changed', {
+        userId: socket.id,
+        isMuted: data.isMuted,
+        userName: data.userName
+      });
+    }
+  });
+
+  // Ekran paylaşımı
+  socket.on('screen-share-started', (data) => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('user-screen-sharing', {
+        userName: data.userName,
+        isSharing: true
+      });
+    }
+  });
+
+  socket.on('screen-share-stopped', (data) => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('user-screen-sharing', {
+        userName: data.userName,
+        isSharing: false
+      });
     }
   });
 
@@ -452,15 +544,18 @@ io.on('connection', (socket) => {
         const user = room.users[userIndex];
         room.users.splice(userIndex, 1);
         
-        io.to(socket.roomCode).emit('user-left', user);
+        socket.to(socket.roomCode).emit('user-left', {
+          userName: user.name,
+          participants: room.users
+        });
+        
         io.to(socket.roomCode).emit('update-participants', room.users);
         
-        io.to(socket.roomCode).emit('new-message', {
-          user: 'Sistem',
-          text: `${user.name} odadan ayrıldı`,
+        socket.to(socket.roomCode).emit('receive-message', {
+          userName: 'Sistem',
+          message: `${user.name} odadan ayrıldı`,
           timestamp: new Date().toLocaleTimeString('tr-TR'),
-          type: 'system',
-          messageId: generateMessageId()
+          type: 'system'
         });
         
         if (room.users.length === 0) {
