@@ -1,4 +1,4 @@
-// server.js - WEBRTC SİNYAL SUNUCUSU EKLENDİ
+// server.js - WEBRTC SİNYAL SUNUCUSU TAMAMEN GÜNCELLENDİ
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -168,10 +168,6 @@ function generateRoomCode() {
   return result;
 }
 
-function generateMessageId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
 function cleanupInactiveRooms() {
   const now = new Date();
   let cleanedCount = 0;
@@ -320,7 +316,7 @@ io.on('connection', (socket) => {
     updateStats();
   });
 
-  // Odaya katılma
+  // Odaya katılma - WEBRTC ENTEGRASYONU EKLENDİ
   socket.on('join-room', (data) => {
     if (!checkSocketRateLimit(socket)) {
       socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
@@ -376,17 +372,31 @@ io.on('connection', (socket) => {
     room.lastActivity = new Date();
     room.stats.totalUsers++;
 
+    // Mevcut kullanıcıları yeni kullanıcıya gönder
+    const existingUsers = room.users.filter(u => u.id !== socket.id).map(u => ({
+      socketId: u.id,
+      userName: u.name
+    }));
+
     socket.emit('room-joined', {
       roomCode,
       user,
       roomSettings: room.settings,
       roomCreatedAt: room.createdAt,
-      participants: room.users
+      participants: room.users,
+      existingUsers: existingUsers
+    });
+    
+    // Yeni kullanıcıyı mevcut kullanıcılara bildir
+    socket.to(roomCode).emit('new-user-joined', {
+      socketId: socket.id,
+      userName: user.name
     });
     
     socket.to(roomCode).emit('user-joined', {
       userName: user.name,
-      participants: room.users
+      participants: room.users,
+      socketId: socket.id
     });
     
     io.to(roomCode).emit('update-participants', room.users);
@@ -440,9 +450,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WEBRTC SİNYALLEŞME - EKLENDİ
+  // WEBRTC SİNYALLEŞME - TAMAMEN YENİLENDİ
   socket.on('webrtc-offer', (data) => {
-    console.log('WebRTC offer alındı:', data.targetSocketId);
+    console.log('WebRTC offer alındı:', data.targetSocketId, 'from:', socket.id);
     socket.to(data.targetSocketId).emit('webrtc-offer', {
       offer: data.offer,
       fromSocketId: socket.id,
@@ -451,7 +461,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('webrtc-answer', (data) => {
-    console.log('WebRTC answer alındı:', data.targetSocketId);
+    console.log('WebRTC answer alındı:', data.targetSocketId, 'from:', socket.id);
     socket.to(data.targetSocketId).emit('webrtc-answer', {
       answer: data.answer,
       fromSocketId: socket.id,
@@ -460,7 +470,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('webrtc-ice-candidate', (data) => {
-    console.log('WebRTC ICE candidate alındı:', data.targetSocketId);
+    console.log('WebRTC ICE candidate alındı:', data.targetSocketId, 'from:', socket.id);
     socket.to(data.targetSocketId).emit('webrtc-ice-candidate', {
       candidate: data.candidate,
       fromSocketId: socket.id,
@@ -468,15 +478,15 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Oda içindeki tüm kullanıcılara ses/video başlatma sinyali gönder
-  socket.on('start-media-stream', (data) => {
+  // Medya durumu güncelleme
+  socket.on('media-status-update', (data) => {
     if (socket.roomCode) {
-      console.log('Medya akışı başlatma sinyali:', socket.id);
-      socket.to(socket.roomCode).emit('user-started-media', {
+      socket.to(socket.roomCode).emit('user-media-updated', {
         socketId: socket.id,
         userName: data.userName,
+        hasVideo: data.hasVideo,
         hasAudio: data.hasAudio,
-        hasVideo: data.hasVideo
+        isScreenSharing: data.isScreenSharing
       });
     }
   });
@@ -519,7 +529,8 @@ io.on('connection', (socket) => {
     if (socket.roomCode) {
       socket.to(socket.roomCode).emit('user-screen-sharing', {
         userName: data.userName,
-        isSharing: true
+        isSharing: true,
+        socketId: socket.id
       });
     }
   });
@@ -528,7 +539,8 @@ io.on('connection', (socket) => {
     if (socket.roomCode) {
       socket.to(socket.roomCode).emit('user-screen-sharing', {
         userName: data.userName,
-        isSharing: false
+        isSharing: false,
+        socketId: socket.id
       });
     }
   });
@@ -544,9 +556,16 @@ io.on('connection', (socket) => {
         const user = room.users[userIndex];
         room.users.splice(userIndex, 1);
         
+        // Tüm kullanıcılara ayrılan kullanıcıyı bildir
+        socket.to(socket.roomCode).emit('user-disconnected', {
+          socketId: socket.id,
+          userName: user.name
+        });
+        
         socket.to(socket.roomCode).emit('user-left', {
           userName: user.name,
-          participants: room.users
+          participants: room.users,
+          socketId: socket.id
         });
         
         io.to(socket.roomCode).emit('update-participants', room.users);
