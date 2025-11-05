@@ -1,4 +1,4 @@
-// server.js - WEBRTC SİNYAL SUNUCUSU TAMAMEN GÜNCELLENDİ
+// server.js - PROFESYONEL SÜRÜM
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -215,6 +215,22 @@ const checkSocketRateLimit = (socket) => {
   return true;
 };
 
+// Sistem mesajı gönder
+function sendSystemMessage(roomCode, message) {
+  const room = rooms.get(roomCode);
+  if (room) {
+    const systemMessage = {
+      userName: 'Sistem',
+      message: message,
+      timestamp: new Date().toLocaleTimeString('tr-TR'),
+      type: 'system'
+    };
+    
+    io.to(roomCode).emit('receive-message', systemMessage);
+    console.log('Sistem mesajı:', message);
+  }
+}
+
 // Socket.io bağlantıları
 io.on('connection', (socket) => {
   console.log('Yeni kullanıcı bağlandı:', socket.id);
@@ -316,7 +332,7 @@ io.on('connection', (socket) => {
     updateStats();
   });
 
-  // Odaya katılma - WEBRTC ENTEGRASYONU EKLENDİ
+  // Odaya katılma
   socket.on('join-room', (data) => {
     if (!checkSocketRateLimit(socket)) {
       socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
@@ -363,7 +379,7 @@ io.on('connection', (socket) => {
       name: userName,
       joinedAt: new Date(),
       isHost: room.users.length === 0,
-      isMuted: true,
+      isMuted: false,
       isSpeaking: false,
       lastSeen: new Date()
     };
@@ -401,12 +417,8 @@ io.on('connection', (socket) => {
     
     io.to(roomCode).emit('update-participants', room.users);
     
-    socket.to(roomCode).emit('receive-message', {
-      userName: 'Sistem',
-      message: `${user.name} odaya katıldı`,
-      timestamp: new Date().toLocaleTimeString('tr-TR'),
-      type: 'system'
-    });
+    // Sistem mesajı gönder
+    sendSystemMessage(roomCode, `${user.name} odaya katıldı`);
     
     console.log('Kullanıcı odaya katıldı:', user.name, 'Oda:', roomCode);
     
@@ -450,7 +462,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WEBRTC SİNYALLEŞME - TAMAMEN YENİLENDİ
+  // WEBRTC SİNYALLEŞME
   socket.on('webrtc-offer', (data) => {
     console.log('WebRTC offer alındı:', data.targetSocketId, 'from:', socket.id);
     socket.to(data.targetSocketId).emit('webrtc-offer', {
@@ -488,6 +500,15 @@ io.on('connection', (socket) => {
         hasAudio: data.hasAudio,
         isScreenSharing: data.isScreenSharing
       });
+
+      // Sistem mesajı gönder
+      if (data.hasVideo && !data.isScreenSharing) {
+        sendSystemMessage(socket.roomCode, `${data.userName} kamerasını açtı`);
+      } else if (!data.hasVideo && !data.isScreenSharing) {
+        sendSystemMessage(socket.roomCode, `${data.userName} kamerasını kapattı`);
+      } else if (data.isScreenSharing) {
+        sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı başlattı`);
+      }
     }
   });
 
@@ -521,6 +542,13 @@ io.on('connection', (socket) => {
         isMuted: data.isMuted,
         userName: data.userName
       });
+
+      // Sistem mesajı gönder
+      if (data.isMuted) {
+        sendSystemMessage(socket.roomCode, `${data.userName} mikrofonunu kapattı`);
+      } else {
+        sendSystemMessage(socket.roomCode, `${data.userName} mikrofonunu açtı`);
+      }
     }
   });
 
@@ -532,6 +560,7 @@ io.on('connection', (socket) => {
         isSharing: true,
         socketId: socket.id
       });
+      sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı başlattı`);
     }
   });
 
@@ -542,6 +571,7 @@ io.on('connection', (socket) => {
         isSharing: false,
         socketId: socket.id
       });
+      sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı durdurdu`);
     }
   });
 
@@ -570,12 +600,8 @@ io.on('connection', (socket) => {
         
         io.to(socket.roomCode).emit('update-participants', room.users);
         
-        socket.to(socket.roomCode).emit('receive-message', {
-          userName: 'Sistem',
-          message: `${user.name} odadan ayrıldı`,
-          timestamp: new Date().toLocaleTimeString('tr-TR'),
-          type: 'system'
-        });
+        // Sistem mesajı gönder
+        sendSystemMessage(socket.roomCode, `${user.name} odadan ayrıldı`);
         
         if (room.users.length === 0) {
           room.lastActivity = new Date();

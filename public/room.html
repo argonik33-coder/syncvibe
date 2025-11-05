@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SyncVibe - Sohbet Odası</title>
+    <title>SyncVibe - Profesyonel Sohbet Odası</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -121,6 +121,10 @@
             color: #93c5fd;
             font-style: italic;
             margin: 8px 0;
+            font-size: 0.875rem;
+        }
+        .system-message i {
+            margin-right: 6px;
         }
         .audio-indicator {
             position: absolute;
@@ -139,6 +143,84 @@
         }
         .audio-muted {
             background: #ef4444;
+        }
+        /* Tam Ekran Stilleri */
+        .video-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            border-radius: 0;
+        }
+        .video-fullscreen .video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .fullscreen-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            gap: 10px;
+        }
+        .fullscreen-btn {
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .fullscreen-btn:hover {
+            background: rgba(0,0,0,0.9);
+            transform: scale(1.1);
+        }
+        /* Özel Scrollbar */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.3) transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+        }
+        /* Animasyonlar */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+        }
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+        /* Grid Layout */
+        .video-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            transition: all 0.3s ease;
+        }
+        .video-layout.single {
+            grid-template-columns: 1fr;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .video-layout.double {
+            grid-template-columns: repeat(2, 1fr);
         }
     </style>
 </head>
@@ -163,7 +245,7 @@
                         </div>
                         <div>
                             <h1 class="text-xl font-bold text-white">SyncVibe</h1>
-                            <p class="text-blue-100 text-sm">v1.0</p>
+                            <p class="text-blue-100 text-sm">Profesyonel Sürüm</p>
                         </div>
                     </div>
                     <div class="hidden md:block h-8 w-px bg-white/20"></div>
@@ -192,9 +274,9 @@
                     </div>
 
                     <!-- Mikrofon Durumu -->
-                    <div id="globalMicStatus" class="hidden sm:flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2">
-                        <i class="fas fa-microphone-slash text-sm"></i>
-                        <span class="text-sm font-medium">Sessiz</span>
+                    <div id="globalMicStatus" class="hidden sm:flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
+                        <i class="fas fa-microphone text-sm"></i>
+                        <span class="text-sm font-medium">Açık</span>
                     </div>
 
                     <!-- Tema Butonu -->
@@ -229,8 +311,8 @@
                         <div id="mobileConnectionStatus" class="flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
                             <i class="fas fa-wifi text-sm"></i>
                         </div>
-                        <div id="mobileMicStatus" class="flex items-center space-x-2 text-red-200 bg-red-500/20 rounded-lg px-3 py-2">
-                            <i class="fas fa-microphone-slash text-sm"></i>
+                        <div id="mobileMicStatus" class="flex items-center space-x-2 text-green-200 bg-green-500/20 rounded-lg px-3 py-2">
+                            <i class="fas fa-microphone text-sm"></i>
                         </div>
                     </div>
                 </div>
@@ -241,14 +323,14 @@
     <!-- Ana İçerik -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <!-- Video Grid -->
-        <div id="videoGrid" class="video-grid">
+        <div id="videoGrid" class="video-layout">
             <!-- Videolar burada görünecek -->
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6 mt-6">
             <!-- Sol Sidebar - Katılımcılar -->
             <div class="xl:col-span-1 participants-container">
-                <div class="glass rounded-2xl p-6 h-full">
+                <div class="glass rounded-2xl p-6 h-full flex flex-col">
                     <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
                         <i class="fas fa-user-friends mr-3 text-blue-200"></i>
                         Katılımcılar
@@ -267,7 +349,7 @@
                         </div>
                     </div>
                     
-                    <div id="participantsList" class="space-y-3 max-h-80 xl:max-h-[calc(100vh-300px)] overflow-y-auto message-scroll">
+                    <div id="participantsList" class="flex-1 space-y-3 overflow-y-auto custom-scrollbar">
                         <!-- Katılımcılar buraya eklenecek -->
                         <div class="text-center py-8">
                             <i class="fas fa-users text-2xl text-white/50 mb-3"></i>
@@ -279,14 +361,14 @@
                     <div class="mt-6 pt-4 border-t border-white/20">
                         <div class="space-y-3 text-xs">
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Bağlantı:</span>
+                                <span class="text-blue-200">Bağlantı Durumu:</span>
                                 <span id="connectionInfo" class="text-green-200 flex items-center">
                                     <i class="fas fa-circle text-xs mr-1"></i>
                                     Stabil
                                 </span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Gecikme:</span>
+                                <span class="text-blue-200">Ağ Gecikmesi:</span>
                                 <span class="text-white" id="latencyInfo">~25ms</span>
                             </div>
                             <div class="flex justify-between items-center">
@@ -311,7 +393,7 @@
                 <!-- Sohbet Kutusu -->
                 <div class="glass rounded-2xl h-full flex flex-col">
                     <!-- Mesajlar -->
-                    <div id="messages" class="flex-1 p-6 space-y-4 overflow-y-auto message-scroll max-h-[500px] xl:max-h-[calc(100vh-300px)]">
+                    <div id="messages" class="flex-1 p-6 space-y-4 overflow-y-auto custom-scrollbar max-h-[500px] xl:max-h-[calc(100vh-300px)]">
                         <div class="text-center py-12">
                             <i class="fas fa-comments text-3xl text-white/50 mb-4"></i>
                             <p class="text-blue-200 text-lg font-semibold">Sohbet Başlatın</p>
@@ -365,63 +447,36 @@
                             <button 
                                 id="micBtn"
                                 onclick="toggleMic()"
-                                class="w-full bg-red-500/20 hover:bg-red-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-red-400/30"
+                                class="w-full bg-green-500/20 hover:bg-green-500/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-green-400/30"
                             >
-                                <i class="fas fa-microphone-slash"></i>
-                                <span>Mikrofonu Aç</span>
+                                <i class="fas fa-microphone"></i>
+                                <span>Mikrofonu Kapat</span>
                             </button>
                             
                             <!-- Ses Seviye Göstergesi -->
                             <div class="bg-white/10 rounded-lg p-4">
                                 <div class="flex items-center justify-between mb-2">
-                                    <span class="text-blue-200 text-sm">Ses Durumu</span>
-                                    <span class="text-green-200 text-sm" id="audioStatus">%100</span>
+                                    <span class="text-blue-200 text-sm">Ses Seviyesi</span>
+                                    <span class="text-green-200 text-sm" id="audioStatus">%0</span>
                                 </div>
                                 <div class="audio-visualizer">
                                     <div id="audioLevel" class="audio-level" style="width: 0%"></div>
                                 </div>
                                 <div class="text-blue-200 text-xs mt-2 text-center">
-                                    Ses seviyesi otomatik ayarlanır
+                                    Gerçek zamanlı ses seviyesi
                                 </div>
                             </div>
-
-                            <!-- Ses Testi -->
-                            <button 
-                                onclick="testAudio()"
-                                class="w-full bg-blue-500/20 hover:bg-blue-500/30 text-white py-2 px-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-blue-400/30 text-sm"
-                            >
-                                <i class="fas fa-volume-up"></i>
-                                <span>Sesi Test Et</span>
-                            </button>
                         </div>
                     </div>
 
-                    <!-- Paylaşım Kontrolleri -->
+                    <!-- Görüntü Kontrolleri -->
                     <div class="glass rounded-2xl p-6">
                         <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-                            <i class="fas fa-desktop mr-3 text-purple-200"></i>
-                            Paylaşım
+                            <i class="fas fa-video mr-3 text-purple-200"></i>
+                            Görüntü Kontrolleri
                         </h2>
                         
                         <div class="space-y-3">
-                            <button 
-                                id="screenBtn"
-                                onclick="toggleScreenShare()"
-                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
-                            >
-                                <i class="fas fa-desktop"></i>
-                                <span>Ekran Paylaş</span>
-                            </button>
-                            
-                            <button 
-                                id="fileBtn"
-                                onclick="shareFile()"
-                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
-                            >
-                                <i class="fas fa-file-upload"></i>
-                                <span>Dosya Paylaş</span>
-                            </button>
-
                             <button 
                                 id="cameraBtn"
                                 onclick="toggleCamera()"
@@ -429,6 +484,15 @@
                             >
                                 <i class="fas fa-video-slash"></i>
                                 <span>Kamerayı Aç</span>
+                            </button>
+
+                            <button 
+                                id="screenBtn"
+                                onclick="toggleScreenShare()"
+                                class="w-full bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 border border-white/20"
+                            >
+                                <i class="fas fa-desktop"></i>
+                                <span>Ekran Paylaş</span>
                             </button>
                         </div>
                     </div>
@@ -442,23 +506,27 @@
                         
                         <div class="space-y-3 text-sm">
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Oluşturulma</span>
+                                <span class="text-blue-200">Oluşturulma:</span>
                                 <span class="text-white" id="roomCreated">--:--</span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Süre</span>
+                                <span class="text-blue-200">Oda Süresi:</span>
                                 <span class="text-white" id="roomDuration">00:00</span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Durum</span>
+                                <span class="text-blue-200">Oda Durumu:</span>
                                 <span class="text-green-200 flex items-center">
                                     <i class="fas fa-circle text-xs mr-1"></i>
                                     Aktif
                                 </span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-blue-200">Versiyon</span>
-                                <span class="text-white">v1.0</span>
+                                <span class="text-blue-200">Maks. Kullanıcı:</span>
+                                <span class="text-white">10</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-200">Versiyon:</span>
+                                <span class="text-white">Profesyonel</span>
                             </div>
                         </div>
                     </div>
@@ -515,9 +583,9 @@
         let totalMessages = 0;
         let activeDuration = 0;
 
-        // WebRTC Değişkenleri - TAMAMEN YENİLENDİ
+        // WebRTC Değişkenleri
         let localStream = null;
-        let isAudioMuted = true;
+        let isAudioMuted = false;
         let isVideoEnabled = false;
         let isScreenSharing = false;
         let screenStream = null;
@@ -525,14 +593,20 @@
         let analyser = null;
         let audioLevelInterval = null;
 
+        // Tam Ekran Değişkenleri
+        let fullscreenVideoId = null;
+
         // WebRTC Bağlantıları
         let peerConnections = new Map();
         const rtcConfiguration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
             ],
-            sdpSemantics: 'unified-plan'
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
         };
 
         // Tema değiştirme
@@ -594,7 +668,12 @@
                 
                 startRoomTimer();
                 startActiveDurationTimer();
-                showNotification(`${roomCode} odasına hoş geldiniz, ${userName}!`, 'success');
+                showNotification(`${roomCode} odasına hoş geldiniz!`, 'success');
+                
+                // Otomatik olarak mikrofonu başlat
+                setTimeout(() => {
+                    initializeMedia();
+                }, 1000);
             } else {
                 window.location.href = '/';
             }
@@ -612,9 +691,102 @@
             });
         });
 
-        // WEBRTC FONKSİYONLARI - TAMAMEN YENİLENDİ
+        // Medya başlatma
+        async function initializeMedia() {
+            try {
+                if (!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            channelCount: 1,
+                            sampleRate: 48000,
+                            sampleSize: 16
+                        },
+                        video: false
+                    });
+                    
+                    startAudioLevelMonitor();
+                    updateAudioButton();
+                    updateGlobalMicStatus();
+                    
+                    showNotification('Mikrofon başlatıldı', 'success');
+                }
+            } catch (error) {
+                console.error('Medya başlatma hatası:', error);
+                showNotification('Mikrofon erişimi reddedildi', 'error');
+            }
+        }
 
-        // Yeni bir kullanıcı için WebRTC bağlantısı oluştur
+        // TAM EKRAN FONKSİYONLARI
+        function toggleVideoFullscreen(videoId) {
+            const videoContainer = document.getElementById(`video-${videoId}`);
+            
+            if (!videoContainer) return;
+            
+            if (fullscreenVideoId === videoId) {
+                exitVideoFullscreen();
+            } else {
+                enterVideoFullscreen(videoId);
+            }
+        }
+
+        function enterVideoFullscreen(videoId) {
+            const videoContainer = document.getElementById(`video-${videoId}`);
+            const videoElement = document.getElementById(`video-element-${videoId}`);
+            
+            if (!videoContainer || !videoElement) return;
+            
+            if (fullscreenVideoId) {
+                exitVideoFullscreen();
+            }
+            
+            videoContainer.classList.add('video-fullscreen');
+            videoElement.style.objectFit = 'contain';
+            
+            const controls = document.createElement('div');
+            controls.className = 'fullscreen-controls';
+            controls.innerHTML = `
+                <button class="fullscreen-btn" onclick="exitVideoFullscreen()" title="Tam Ekrandan Çık">
+                    <i class="fas fa-compress"></i>
+                </button>
+            `;
+            videoContainer.appendChild(controls);
+            
+            fullscreenVideoId = videoId;
+            
+            document.addEventListener('keydown', handleFullscreenKeydown);
+        }
+
+        function exitVideoFullscreen() {
+            if (!fullscreenVideoId) return;
+            
+            const videoContainer = document.getElementById(`video-${fullscreenVideoId}`);
+            const videoElement = document.getElementById(`video-element-${fullscreenVideoId}`);
+            
+            if (videoContainer && videoElement) {
+                videoContainer.classList.remove('video-fullscreen');
+                videoElement.style.objectFit = 'cover';
+                
+                const controls = videoContainer.querySelector('.fullscreen-controls');
+                if (controls) {
+                    controls.remove();
+                }
+            }
+            
+            fullscreenVideoId = null;
+            document.removeEventListener('keydown', handleFullscreenKeydown);
+        }
+
+        function handleFullscreenKeydown(event) {
+            if (event.key === 'Escape' && fullscreenVideoId) {
+                exitVideoFullscreen();
+            }
+        }
+
+        // WEBRTC FONKSİYONLARI - GELİŞTİRİLMİŞ
+
         async function createPeerConnection(targetSocketId, userName) {
             console.log('Yeni WebRTC bağlantısı oluşturuluyor:', targetSocketId);
             
@@ -623,6 +795,7 @@
             // Local stream'i ekle
             if (localStream) {
                 localStream.getTracks().forEach(track => {
+                    console.log('Track ekleniyor:', track.kind, track.enabled);
                     peerConnection.addTrack(track, localStream);
                 });
             }
@@ -633,6 +806,15 @@
                 const remoteStream = event.streams[0];
                 if (remoteStream) {
                     createVideoElement(targetSocketId, remoteStream, false, userName);
+                    
+                    // Ses track'ini kontrol et ve muted durumunu ayarla
+                    const audioTracks = remoteStream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        const audioElement = document.querySelector(`#video-element-${targetSocketId}`);
+                        if (audioElement) {
+                            audioElement.muted = false;
+                        }
+                    }
                 }
             };
             
@@ -672,7 +854,6 @@
                 peerConnections.delete(socketId);
             }
             
-            // Video elementini kaldır
             const videoElement = document.getElementById(`video-${socketId}`);
             if (videoElement) {
                 videoElement.remove();
@@ -692,6 +873,7 @@
                     offerToReceiveAudio: true,
                     offerToReceiveVideo: true
                 });
+                
                 await peerConnection.setLocalDescription(offer);
                 
                 socket.emit('webrtc-offer', {
@@ -706,7 +888,7 @@
             }
         }
 
-        // Tüm peer connection'lara track ekle/güncelle
+        // Tüm peer connection'lara track'leri güncelle
         function updateTracksForAllPeers() {
             if (!localStream) return;
             
@@ -719,7 +901,9 @@
                     );
                     
                     if (existingSender) {
-                        existingSender.replaceTrack(track);
+                        existingSender.replaceTrack(track).catch(error => {
+                            console.error('Track değiştirme hatası:', error);
+                        });
                     } else {
                         peerConnection.addTrack(track, localStream);
                     }
@@ -727,27 +911,12 @@
             });
         }
 
-        // Mikrofon kontrolü - GÜNCELLENDİ
+        // Mikrofon kontrolü
         async function toggleMic() {
             try {
                 if (!localStream) {
-                    // İlk kez tıklandığında mikrofon izni iste
-                    localStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                            channelCount: 1
-                        },
-                        video: false
-                    });
-                    
-                    startAudioLevelMonitor();
-                    
-                    // Mevcut kullanıcılarla bağlantı kur
-                    socket.emit('request-existing-users', { 
-                        roomCode: document.getElementById('currentRoomCode').textContent 
-                    });
+                    await initializeMedia();
+                    return;
                 }
                 
                 const audioTracks = localStream.getAudioTracks();
@@ -767,15 +936,15 @@
                     userName: document.getElementById('currentUserName').textContent
                 });
                 
-                showNotification(isAudioMuted ? 'Mikrofon kapatıldı 🔇' : 'Mikrofon açıldı 🎤', 'success');
+                showNotification(isAudioMuted ? 'Mikrofon kapatıldı' : 'Mikrofon açıldı', 'success');
                 
             } catch (error) {
                 console.error('Mikrofon kontrol hatası:', error);
-                showNotification('Mikrofon erişimi reddedildi veya başarısız', 'error');
+                showNotification('Mikrofon kontrolü başarısız', 'error');
             }
         }
 
-        // Kamera kontrolü - GÜNCELLENDİ
+        // Kamera kontrolü
         async function toggleCamera() {
             try {
                 if (isScreenSharing) {
@@ -784,7 +953,6 @@
                 }
                 
                 if (!isVideoEnabled) {
-                    // Kamera aç
                     const videoStream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             width: { ideal: 1280 },
@@ -795,42 +963,34 @@
                     });
                     
                     if (localStream) {
-                        // Mevcut video track'larını kaldır
                         const videoTracks = localStream.getVideoTracks();
                         videoTracks.forEach(track => {
                             track.stop();
                             localStream.removeTrack(track);
                         });
                         
-                        // Yeni video track'larını ekle
                         videoStream.getVideoTracks().forEach(track => {
                             localStream.addTrack(track);
                         });
                     } else {
                         localStream = videoStream;
-                        // Mikrofonu da ekle
-                        const audioStream = await navigator.mediaDevices.getUserMedia({
-                            audio: {
-                                echoCancellation: true,
-                                noiseSuppression: true,
-                                autoGainControl: true
-                            },
-                            video: false
-                        });
-                        audioStream.getAudioTracks().forEach(track => {
-                            localStream.addTrack(track);
-                        });
-                        startAudioLevelMonitor();
+                        await initializeMedia();
                     }
                     
                     createVideoElement(socket.id, localStream, true, 'Kamera');
                     isVideoEnabled = true;
                     
-                    // Tüm peer connection'lara video track'larını ekle
                     updateTracksForAllPeers();
                     
+                    // Medya durumunu güncelle
+                    socket.emit('media-status-update', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasVideo: true,
+                        hasAudio: !isAudioMuted,
+                        isScreenSharing: false
+                    });
+                    
                 } else {
-                    // Kamera kapat
                     const videoTracks = localStream.getVideoTracks();
                     if (videoTracks.length > 0) {
                         videoTracks.forEach(track => {
@@ -845,12 +1005,18 @@
                     }
                     isVideoEnabled = false;
                     
-                    // Tüm peer connection'lardan video track'larını kaldır
                     updateTracksForAllPeers();
+                    
+                    // Medya durumunu güncelle
+                    socket.emit('media-status-update', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasVideo: false,
+                        hasAudio: !isAudioMuted,
+                        isScreenSharing: false
+                    });
                 }
                 
                 updateCameraButton();
-                showNotification(isVideoEnabled ? 'Kamera açıldı' : 'Kamera kapatıldı', 'success');
                 
             } catch (error) {
                 console.error('Kamera kontrol hatası:', error);
@@ -858,7 +1024,7 @@
             }
         }
 
-        // Ekran paylaşımı - GÜNCELLENDİ
+        // Ekran paylaşımı - GELİŞTİRİLMİŞ
         async function toggleScreenShare() {
             try {
                 if (isScreenSharing) {
@@ -879,11 +1045,19 @@
                     }
                     
                     updateScreenShareButton();
-                    showNotification('Ekran paylaşımı durduruldu', 'success');
                     
                     socket.emit('screen-share-stopped', {
                         userName: document.getElementById('currentUserName').textContent
                     });
+                    
+                    // Medya durumunu güncelle
+                    socket.emit('media-status-update', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasVideo: isVideoEnabled,
+                        hasAudio: !isAudioMuted,
+                        isScreenSharing: false
+                    });
+                    
                 } else {
                     // Ekran paylaşımı başlat
                     screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -911,6 +1085,15 @@
                                 } else {
                                     peerConnection.addTrack(track, screenStream);
                                 }
+                            } else if (track.kind === 'audio') {
+                                const audioSender = peerConnection.getSenders().find(s => 
+                                    s.track && s.track.kind === 'audio'
+                                );
+                                if (audioSender) {
+                                    audioSender.replaceTrack(track);
+                                } else {
+                                    peerConnection.addTrack(track, screenStream);
+                                }
                             }
                         });
                         
@@ -920,10 +1103,17 @@
                     });
                     
                     updateScreenShareButton();
-                    showNotification('Ekran paylaşımı başlatıldı', 'success');
                     
                     socket.emit('screen-share-started', {
                         userName: document.getElementById('currentUserName').textContent
+                    });
+                    
+                    // Medya durumunu güncelle
+                    socket.emit('media-status-update', {
+                        userName: document.getElementById('currentUserName').textContent,
+                        hasVideo: false,
+                        hasAudio: !isAudioMuted,
+                        isScreenSharing: true
                     });
                 }
             } catch (error) {
@@ -934,7 +1124,7 @@
             }
         }
 
-        // Video elementi oluştur - GÜNCELLENDİ
+        // Video elementi oluştur
         function createVideoElement(userId, stream, isLocal = false, title = '') {
             const videoGrid = document.getElementById('videoGrid');
             let videoContainer = document.getElementById(`video-${userId}`);
@@ -958,15 +1148,31 @@
                     ${title || (isLocal ? 'Siz' : 'Kullanıcı')}
                 `;
                 
-                // Ses indikatörü
                 const audioIndicator = document.createElement('div');
-                audioIndicator.className = `audio-indicator ${isLocal ? (isAudioMuted ? 'audio-muted' : 'audio-speaking') : 'audio-muted'}`;
+                audioIndicator.className = `audio-indicator ${isLocal ? (isAudioMuted ? 'audio-muted' : 'audio-speaking') : 'audio-speaking'}`;
                 audioIndicator.innerHTML = '<i class="fas fa-microphone text-xs text-white"></i>';
+                
+                const fullscreenBtn = document.createElement('button');
+                fullscreenBtn.className = 'fullscreen-btn';
+                fullscreenBtn.style.position = 'absolute';
+                fullscreenBtn.style.top = '10px';
+                fullscreenBtn.style.right = '40px';
+                fullscreenBtn.style.zIndex = '10';
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand text-xs"></i>';
+                fullscreenBtn.title = 'Tam Ekran';
+                fullscreenBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleVideoFullscreen(userId);
+                };
                 
                 videoContainer.appendChild(videoElement);
                 videoContainer.appendChild(overlay);
                 videoContainer.appendChild(audioIndicator);
+                videoContainer.appendChild(fullscreenBtn);
                 videoGrid.appendChild(videoContainer);
+                
+                // Video grid layout'ını güncelle
+                updateVideoLayout();
             }
             
             const videoElement = document.getElementById(`video-element-${userId}`);
@@ -981,14 +1187,27 @@
             }
         }
 
-        // SOCKET EVENT LISTENER'LARI - GÜNCELLENDİ
+        // Video grid layout'ını güncelle
+        function updateVideoLayout() {
+            const videoGrid = document.getElementById('videoGrid');
+            const videoCount = videoGrid.children.length;
+            
+            videoGrid.className = 'video-layout';
+            
+            if (videoCount === 1) {
+                videoGrid.classList.add('single');
+            } else if (videoCount === 2) {
+                videoGrid.classList.add('double');
+            }
+        }
+
+        // SOCKET EVENT LISTENER'LARI
 
         // Odaya başarıyla katılma
         socket.on('room-joined', (data) => {
             console.log('Odaya katıldı:', data);
             updateParticipantList(data.participants);
             
-            // Mevcut kullanıcılarla WebRTC bağlantısı kur
             if (data.existingUsers && data.existingUsers.length > 0) {
                 data.existingUsers.forEach(user => {
                     createAndSendOffer(user.socketId, user.userName);
@@ -1052,12 +1271,13 @@
         socket.on('user-disconnected', (data) => {
             console.log('Kullanıcı bağlantısı kesildi:', data.socketId);
             cleanupPeerConnection(data.socketId);
+            updateVideoLayout();
         });
 
         // Kullanıcı ayrılma
         socket.on('user-left', (data) => {
-            showNotification(`${data.userName} odadan ayrıldı`, 'info');
             cleanupPeerConnection(data.socketId);
+            updateVideoLayout();
         });
 
         // Mesaj alma
@@ -1080,7 +1300,7 @@
 
         // Kullanıcı katılma
         socket.on('user-joined', (data) => {
-            showNotification(`${data.userName} odaya katıldı`, 'success');
+            // Sistem mesajı otomatik olarak gönderilecek
         });
 
         // Yazıyor indikatörü
@@ -1101,7 +1321,6 @@
         socket.on('audio-state-changed', (data) => {
             updateParticipantAudioStatus(data.userId, data.isMuted);
             
-            // Video elementindeki ses indikatörünü güncelle
             const audioIndicator = document.querySelector(`#video-${data.userId} .audio-indicator`);
             if (audioIndicator) {
                 if (data.isMuted) {
@@ -1118,8 +1337,15 @@
                 const screenElement = document.getElementById(`video-${data.socketId}-screen`);
                 if (screenElement) {
                     screenElement.remove();
+                    updateVideoLayout();
                 }
             }
+        });
+
+        // Medya durumu güncelleme
+        socket.on('user-media-updated', (data) => {
+            // Medya durumu değişiklikleri için işlemler
+            console.log('Medya durumu güncellendi:', data);
         });
 
         // Ses seviyesi monitörü
@@ -1139,6 +1365,7 @@
                 audioLevelInterval = setInterval(() => {
                     if (!localStream) {
                         document.getElementById('audioLevel').style.width = '0%';
+                        document.getElementById('audioStatus').textContent = '%0';
                         return;
                     }
                     
@@ -1152,8 +1379,10 @@
                     
                     if (!isAudioMuted) {
                         document.getElementById('audioLevel').style.width = level + '%';
+                        document.getElementById('audioStatus').textContent = '%' + Math.round(level);
                     } else {
                         document.getElementById('audioLevel').style.width = '0%';
+                        document.getElementById('audioStatus').textContent = '%0';
                     }
                 }, 100);
             } catch (error) {
@@ -1286,10 +1515,18 @@
             
             if (isSystem) {
                 messageElement.className = 'system-message';
+                let icon = 'fa-info-circle';
+                if (message.includes('katıldı')) icon = 'fa-user-plus';
+                else if (message.includes('ayrıldı')) icon = 'fa-user-minus';
+                else if (message.includes('mikrofon')) icon = 'fa-microphone';
+                else if (message.includes('kamera')) icon = 'fa-video';
+                else if (message.includes('ekran')) icon = 'fa-desktop';
+                
                 messageElement.innerHTML = `
                     <div class="text-blue-200 text-sm italic">
+                        <i class="fas ${icon} mr-1"></i>
                         <span>${message}</span>
-                        <span class="text-xs ml-2">${timestamp}</span>
+                        <span class="text-xs ml-2 opacity-70">${timestamp}</span>
                     </div>
                 `;
             } else {
@@ -1400,19 +1637,21 @@
             
             notification.className = notification.className.replace(/bg-(red|green|blue|yellow)-500\/20/g, '');
             
-            switch(type) {
-                case 'success':
-                    notification.classList.add('bg-green-500/20', 'border-green-400/30');
-                    break;
-                case 'error':
-                    notification.classList.add('bg-red-500/20', 'border-red-400/30');
-                    break;
-                case 'warning':
-                    notification.classList.add('bg-yellow-500/20', 'border-yellow-400/30');
-                    break;
-                default:
-                    notification.classList.add('bg-blue-500/20', 'border-blue-400/30');
+            let icon = 'fa-info-circle';
+            if (type === 'success') {
+                notification.classList.add('bg-green-500/20', 'border-green-400/30');
+                icon = 'fa-check-circle';
+            } else if (type === 'error') {
+                notification.classList.add('bg-red-500/20', 'border-red-400/30');
+                icon = 'fa-exclamation-circle';
+            } else if (type === 'warning') {
+                notification.classList.add('bg-yellow-500/20', 'border-yellow-400/30');
+                icon = 'fa-exclamation-triangle';
+            } else {
+                notification.classList.add('bg-blue-500/20', 'border-blue-400/30');
             }
+            
+            notification.querySelector('i').className = `fas ${icon} mr-3 text-lg`;
             
             notification.classList.remove('hidden', 'opacity-0', 'translate-y-2');
             notification.classList.add('flex', 'opacity-100', 'translate-y-0');
@@ -1504,13 +1743,13 @@
         function copyRoomCode() {
             const roomCode = document.getElementById('currentRoomCode').textContent;
             navigator.clipboard.writeText(roomCode).then(() => {
-                showNotification('Oda kodu panoya kopyalandı!', 'success');
+                showNotification('Oda kodu panoya kopyalandı', 'success');
             });
         }
 
         function inviteUsers() {
             const roomCode = document.getElementById('currentRoomCode').textContent;
-            const inviteText = `SyncVibe odasına katılın! Oda kodu: ${roomCode}`;
+            const inviteText = `SyncVibe profesyonel sohbet odasına katılın! Oda kodu: ${roomCode}`;
             
             if (navigator.share) {
                 navigator.share({
@@ -1520,7 +1759,7 @@
                 });
             } else {
                 navigator.clipboard.writeText(inviteText).then(() => {
-                    showNotification('Davet metni panoya kopyalandı!', 'success');
+                    showNotification('Davet metni panoya kopyalandı', 'success');
                 });
             }
         }
@@ -1536,19 +1775,15 @@
         }
 
         function showShortcuts() {
-            showNotification('Kısayollar: Enter - Mesaj gönder, Ctrl+M - Mikrofon, Ctrl+S - Ekran paylaşımı', 'info');
-        }
-
-        function testAudio() {
-            showNotification('Ses testi başlatıldı', 'info');
-        }
-
-        function shareFile() {
-            showNotification('Dosya paylaşımı yakında eklenecek', 'info');
+            showNotification('Kısayollar: Enter - Mesaj gönder, ESC - Tam ekrandan çık', 'info');
         }
 
         function leaveRoom() {
             if (confirm('Odadan ayrılmak istediğinizden emin misiniz?')) {
+                if (fullscreenVideoId) {
+                    exitVideoFullscreen();
+                }
+                
                 if (localStream) {
                     localStream.getTracks().forEach(track => track.stop());
                 }
@@ -1559,7 +1794,6 @@
                     clearInterval(audioLevelInterval);
                 }
                 
-                // Tüm WebRTC bağlantılarını kapat
                 peerConnections.forEach(pc => pc.close());
                 peerConnections.clear();
                 
