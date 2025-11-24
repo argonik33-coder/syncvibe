@@ -1,654 +1,202 @@
-// server.js - PROFESYONEL SÜRÜM
+// server.js
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const { Server } = require('socket.io');
 const path = require('path');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const sanitizeHtml = require('sanitize-html');
-
-// Render-specific configuration
-const isProduction = process.env.NODE_ENV || 'development';
-const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server);
 
-// Socket.io konfigürasyonu
-const io = socketIo(server, {
-  cors: {
-    origin: isProduction ? false : "*",
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  transports: ['websocket', 'polling']
-});
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: {
-    error: 'Çok fazla istek gönderiyorsunuz. Lütfen bekleyin.'
-  }
-});
-
-// Middleware'ler
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-}));
-
-app.use(cors());
-app.use(limiter);
-app.use(express.json({ limit: '10kb' }));
+// /public klasörünü statik olarak sun
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ana sayfa route'u
+// Kök URL -> index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Oda sayfası route'u
-app.get('/room.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'room.html'));
-});
+// Kullanıcıları takip etmek için: socket.id -> { name, room }
+const users = {};
 
-// API Routes
-app.get('/api/status', (req, res) => {
-  const activeRooms = Array.from(rooms.values()).filter(room => room.users.length > 0);
-  
-  res.json({
-    status: 'active',
-    roomCount: activeRooms.length,
-    totalUsers: activeRooms.reduce((acc, room) => acc + room.users.length, 0),
-    totalConnections: userSessions.size,
-    version: '1.0.0',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+// Mesaj geçmişi: room -> [ { user, text, time, from } ]
+const roomMessages = {};
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage()
-  });
-});
-
-// Config değişkenleri
-const config = {
-  rooms: {
-    maxUsers: parseInt(process.env.MAX_USERS_PER_ROOM) || 10,
-    codeLength: 6,
-    inactiveTimeout: 2 * 60 * 60 * 1000,
-    maxMessageLength: 500,
-    maxUsernameLength: 20
-  },
-  security: {
-    socketRateLimit: {
-      maxEventsPerMinute: 60
-    }
-  }
-};
-
-// Doğrulama fonksiyonları
-const validateJoinRoom = (data) => {
-  const errors = [];
-  
-  if (!data.roomCode || typeof data.roomCode !== 'string') {
-    errors.push('Oda kodu gereklidir');
-  } else if (data.roomCode.length !== config.rooms.codeLength) {
-    errors.push(`Oda kodu ${config.rooms.codeLength} haneli olmalıdır`);
-  } else if (!/^[A-Z0-9]+$/.test(data.roomCode)) {
-    errors.push('Oda kodu sadece büyük harf ve rakamlardan oluşabilir');
-  }
-
-  if (!data.userName || typeof data.userName !== 'string') {
-    errors.push('Kullanıcı adı gereklidir');
-  } else {
-    const sanitizedUserName = sanitizeHtml(data.userName.trim(), {
-      allowedTags: [],
-      allowedAttributes: {}
-    });
-    
-    if (sanitizedUserName.length === 0) {
-      errors.push('Geçersiz kullanıcı adı');
-    } else if (sanitizedUserName.length > config.rooms.maxUsernameLength) {
-      errors.push(`Kullanıcı adı ${config.rooms.maxUsernameLength} karakteri geçemez`);
-    }
-  }
-
-  return errors;
-};
-
-const validateMessage = (text) => {
-  if (!text || typeof text !== 'string') {
-    return { isValid: false, error: 'Mesaj gereklidir' };
-  }
-
-  const sanitizedText = sanitizeHtml(text.trim(), {
-    allowedTags: [],
-    allowedAttributes: {},
-    allowedIframeHostnames: []
-  });
-
-  if (sanitizedText.length === 0) {
-    return { isValid: false, error: 'Mesaj boş olamaz' };
-  }
-
-  if (sanitizedText.length > config.rooms.maxMessageLength) {
-    return { 
-      isValid: false, 
-      error: `Mesaj ${config.rooms.maxMessageLength} karakteri geçemez` 
-    };
-  }
-
-  return { isValid: true, sanitizedText };
-};
-
-// Oda yönetimi
-const rooms = new Map();
-const userSessions = new Map();
-const socketRateLimitMap = new Map();
-
-function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < config.rooms.codeLength; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+function getUsersInRoom(room) {
+  return Object.entries(users)
+    .filter(([, u]) => u.room === room)
+    .map(([id, u]) => ({ id, name: u.name }));
 }
 
-function cleanupInactiveRooms() {
-  const now = new Date();
-  let cleanedCount = 0;
-
-  for (const [roomCode, room] of rooms.entries()) {
-    if (room.users.length === 0 && (now - room.lastActivity) > config.rooms.inactiveTimeout) {
-      rooms.delete(roomCode);
-      cleanedCount++;
-      console.log(`Inaktif oda temizlendi: ${roomCode}`);
-    }
-  }
-
-  if (cleanedCount > 0) {
-    console.log(`${cleanedCount} inaktif oda temizlendi`);
-  }
+function getRoomHistory(room) {
+  return roomMessages[room] || [];
 }
 
-// Socket rate limiting
-const checkSocketRateLimit = (socket) => {
-  const now = Date.now();
-  const windowMs = 60000;
-  const maxEvents = config.security.socketRateLimit.maxEventsPerMinute;
-
-  if (!socketRateLimitMap.has(socket.id)) {
-    socketRateLimitMap.set(socket.id, {
-      count: 1,
-      firstEvent: now
-    });
-    return true;
-  }
-
-  const userLimit = socketRateLimitMap.get(socket.id);
-  
-  if (now - userLimit.firstEvent > windowMs) {
-    userLimit.count = 1;
-    userLimit.firstEvent = now;
-    return true;
-  }
-
-  if (userLimit.count >= maxEvents) {
-    return false;
-  }
-
-  userLimit.count++;
-  return true;
-};
-
-// Sistem mesajı gönder
-function sendSystemMessage(roomCode, message) {
-  const room = rooms.get(roomCode);
-  if (room) {
-    const systemMessage = {
-      userName: 'Sistem',
-      message: message,
-      timestamp: new Date().toLocaleTimeString('tr-TR'),
-      type: 'system'
-    };
-    
-    io.to(roomCode).emit('receive-message', systemMessage);
-    console.log('Sistem mesajı:', message);
-  }
-}
-
-// Socket.io bağlantıları
 io.on('connection', (socket) => {
-  console.log('Yeni kullanıcı bağlandı:', socket.id);
+  console.log('Yeni bağlantı:', socket.id);
 
-  userSessions.set(socket.id, {
-    id: socket.id,
-    connectedAt: new Date(),
-    lastActivity: new Date(),
-    ip: socket.handshake.address
-  });
+  // Odaya/kanala katılma
+  socket.on('joinRoom', (payload) => {
+    let room, user;
 
-  // Oda kontrolü
-  socket.on('check-room', (roomCode) => {
-    if (!checkSocketRateLimit(socket)) {
-      socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
-      return;
+    if (typeof payload === 'string') {
+      room = payload;
+      user = 'Misafir';
+    } else if (payload && typeof payload === 'object') {
+      room = payload.room;
+      user = payload.user || 'Misafir';
     }
 
-    userSessions.get(socket.id).lastActivity = new Date();
-    
-    const validationErrors = validateJoinRoom({ roomCode, userName: 'temp' });
-    if (validationErrors.length > 0) {
-      socket.emit('error', validationErrors[0]);
-      return;
+    if (!room) return;
+
+    const prevRoom = socket.roomName;
+    const prevUser = users[socket.id];
+
+    // Eski odadan çık
+    if (prevRoom) {
+      socket.leave(prevRoom);
     }
 
-    const room = rooms.get(roomCode.toUpperCase());
-    const exists = room !== undefined;
-    
-    socket.emit('room-exists', { exists: exists });
-  });
+    // Yeni odaya gir
+    socket.join(room);
+    socket.roomName = room;
 
-  // Yeni oda oluşturma
-  socket.on('create-room', (userData) => {
-    if (!checkSocketRateLimit(socket)) {
-      socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
-      return;
+    // Kullanıcı kaydı
+    if (!users[socket.id]) {
+      users[socket.id] = { name: user, room };
+    } else {
+      users[socket.id].name = user;
+      users[socket.id].room = room;
     }
 
-    userSessions.get(socket.id).lastActivity = new Date();
-    
-    if (!userData || !userData.name || typeof userData.name !== 'string') {
-      socket.emit('error', 'Kullanıcı adı gereklidir');
-      return;
+    // Eski odanın kullanıcı listesini güncelle + peer-left + sistem mesajı
+    if (prevRoom && prevRoom !== room) {
+      const prevUsers = getUsersInRoom(prevRoom);
+      io.to(prevRoom).emit('roomUsers', { room: prevRoom, users: prevUsers });
+
+      // WebRTC için ayrılan peer
+      socket.to(prevRoom).emit('peer-left', { id: socket.id });
+
+      // Sistem mesajı
+      io.to(prevRoom).emit('systemMessage', {
+        room: prevRoom,
+        text: `${(prevUser && prevUser.name) || 'Bir kullanıcı'} kanaldan ayrıldı`,
+        time: new Date().toISOString()
+      });
     }
 
-    const sanitizedUserName = sanitizeHtml(userData.name.trim(), {
-      allowedTags: [],
-      allowedAttributes: {}
-    });
-    
-    if (sanitizedUserName.length === 0) {
-      socket.emit('error', 'Geçersiz kullanıcı adı');
-      return;
-    }
-    
-    if (sanitizedUserName.length > config.rooms.maxUsernameLength) {
-      socket.emit('error', `Kullanıcı adı ${config.rooms.maxUsernameLength} karakteri geçemez`);
-      return;
-    }
+    // Yeni odanın kullanıcı listesini gönder
+    const roomUsers = getUsersInRoom(room);
+    io.to(room).emit('roomUsers', { room, users: roomUsers });
 
-    let roomCode;
-    let attempts = 0;
-    do {
-      roomCode = generateRoomCode();
-      attempts++;
-      if (attempts > 10) {
-        console.error('Oda kodu oluşturma başarısız:', socket.id);
-        socket.emit('error', 'Oda oluşturulamadı. Lütfen tekrar deneyin.');
-        return;
-      }
-    } while (rooms.has(roomCode));
+    // Bu kullanıcıya oda mesaj geçmişini gönder
+    const history = getRoomHistory(room);
+    socket.emit('roomHistory', { room, messages: history });
 
-    const createdAt = new Date();
-    
-    const newRoom = {
-      users: [],
-      createdAt: createdAt,
-      lastActivity: createdAt,
-      createdBy: sanitizedUserName,
-      createdBySocketId: socket.id,
-      settings: {
-        maxUsers: config.rooms.maxUsers,
-        allowGuests: true,
-        requirePassword: false,
-        roomType: 'public'
-      },
-      stats: {
-        totalMessages: 0,
-        totalUsers: 0
-      }
-    };
-    
-    rooms.set(roomCode, newRoom);
-    
-    console.log('Yeni oda oluşturuldu:', roomCode, 'Oluşturan:', sanitizedUserName);
-    
-    socket.emit('room-created', roomCode);
-    updateStats();
-  });
-
-  // Odaya katılma
-  socket.on('join-room', (data) => {
-    if (!checkSocketRateLimit(socket)) {
-      socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
-      return;
-    }
-
-    userSessions.get(socket.id).lastActivity = new Date();
-    
-    const validationErrors = validateJoinRoom(data);
-    if (validationErrors.length > 0) {
-      socket.emit('error', validationErrors[0]);
-      return;
-    }
-
-    const roomCode = data.roomCode.toUpperCase();
-    const userName = sanitizeHtml(data.userName.trim(), { 
-      allowedTags: [], 
-      allowedAttributes: {} 
+    // Diğer kullanıcılara sistem mesajı: kanala katıldı
+    socket.to(room).emit('systemMessage', {
+      room,
+      text: `${user} kanala katıldı`,
+      time: new Date().toISOString()
     });
 
-    if (!rooms.has(roomCode)) {
-      socket.emit('error', 'Oda bulunamadı!');
-      return;
-    }
+    console.log(`${socket.id} odaya katıldı: ${room} (${user})`);
+  });
 
-    const room = rooms.get(roomCode);
-    
-    if (room.users.length >= room.settings.maxUsers) {
-      socket.emit('error', 'Oda dolu! Maksimum kullanıcı sayısına ulaşıldı.');
-      return;
-    }
+  // Yazılı sohbet mesajı
+  socket.on('chatMessage', ({ room, user, text }) => {
+    if (!room || !text) return;
 
-    const existingUser = room.users.find(u => u.id === socket.id);
-    if (existingUser) {
-      socket.emit('error', 'Zaten bu odadasınız!');
-      return;
-    }
-
-    socket.join(roomCode);
-    socket.roomCode = roomCode;
-    
-    const user = {
-      id: socket.id,
-      name: userName,
-      joinedAt: new Date(),
-      isHost: room.users.length === 0,
-      isMuted: false,
-      isSpeaking: false,
-      lastSeen: new Date()
-    };
-    
-    room.users.push(user);
-    room.lastActivity = new Date();
-    room.stats.totalUsers++;
-
-    // Mevcut kullanıcıları yeni kullanıcıya gönder
-    const existingUsers = room.users.filter(u => u.id !== socket.id).map(u => ({
-      socketId: u.id,
-      userName: u.name
-    }));
-
-    socket.emit('room-joined', {
-      roomCode,
+    const msg = {
       user,
-      roomSettings: room.settings,
-      roomCreatedAt: room.createdAt,
-      participants: room.users,
-      existingUsers: existingUsers
-    });
-    
-    // Yeni kullanıcıyı mevcut kullanıcılara bildir
-    socket.to(roomCode).emit('new-user-joined', {
-      socketId: socket.id,
-      userName: user.name
-    });
-    
-    socket.to(roomCode).emit('user-joined', {
-      userName: user.name,
-      participants: room.users,
-      socketId: socket.id
-    });
-    
-    io.to(roomCode).emit('update-participants', room.users);
-    
-    // Sistem mesajı gönder
-    sendSystemMessage(roomCode, `${user.name} odaya katıldı`);
-    
-    console.log('Kullanıcı odaya katıldı:', user.name, 'Oda:', roomCode);
-    
-    updateStats();
-  });
+      text,
+      time: new Date().toISOString(),
+      from: socket.id
+    };
 
-  // Mesaj gönderme
-  socket.on('send-message', (messageData) => {
-    if (!checkSocketRateLimit(socket)) {
-      socket.emit('error', 'Çok hızlı istek gönderiyorsunuz. Lütfen bekleyin.');
-      return;
+    if (!roomMessages[room]) {
+      roomMessages[room] = [];
+    }
+    roomMessages[room].push(msg);
+
+    if (roomMessages[room].length > 100) {
+      roomMessages[room].shift();
     }
 
-    userSessions.get(socket.id).lastActivity = new Date();
-    
-    const messageValidation = validateMessage(messageData.message);
-    if (!messageValidation.isValid) {
-      socket.emit('error', messageValidation.error);
-      return;
-    }
+    console.log(`[${room}] ${user}: ${text}`);
 
-    if (socket.roomCode && rooms.has(socket.roomCode)) {
-      const room = rooms.get(socket.roomCode);
-      const user = room.users.find(u => u.id === socket.id);
-      
-      if (user) {
-        const message = {
-          userName: user.name,
-          message: messageValidation.sanitizedText,
-          timestamp: messageData.timestamp || new Date().toLocaleTimeString('tr-TR'),
-          type: 'user'
-        };
-        
-        room.stats.totalMessages++;
-        room.lastActivity = new Date();
-        
-        socket.to(socket.roomCode).emit('receive-message', message);
-        
-        console.log('Yeni mesaj:', user.name, '-', message.message.substring(0, 50));
-      }
-    }
+    io.to(room).emit('chatMessage', msg);
   });
 
-  // WEBRTC SİNYALLEŞME
-  socket.on('webrtc-offer', (data) => {
-    console.log('WebRTC offer alındı:', data.targetSocketId, 'from:', socket.id);
-    socket.to(data.targetSocketId).emit('webrtc-offer', {
-      offer: data.offer,
-      fromSocketId: socket.id,
-      userName: data.userName
+  // Yazıyor / typing
+  socket.on('typing', ({ room, user }) => {
+    if (!room) return;
+    socket.to(room).emit('typing', { room, user: user || 'Misafir' });
+  });
+
+  socket.on('stopTyping', ({ room, user }) => {
+    if (!room) return;
+    socket.to(room).emit('stopTyping', { room, user: user || 'Misafir' });
+  });
+
+  // WebRTC: Çoklu katılımcı için to/from bazlı sinyalleme
+
+  // OFFER: { room, to, from, offer, hasVideo }
+  socket.on('webrtc-offer', ({ room, to, offer, hasVideo }) => {
+    if (!room || !offer || !to) return;
+    io.to(to).emit('webrtc-offer', {
+      room,
+      from: socket.id,
+      offer,
+      hasVideo
     });
   });
 
-  socket.on('webrtc-answer', (data) => {
-    console.log('WebRTC answer alındı:', data.targetSocketId, 'from:', socket.id);
-    socket.to(data.targetSocketId).emit('webrtc-answer', {
-      answer: data.answer,
-      fromSocketId: socket.id,
-      userName: data.userName
+  // ANSWER: { room, to, from, answer }
+  socket.on('webrtc-answer', ({ room, to, answer }) => {
+    if (!room || !answer || !to) return;
+    io.to(to).emit('webrtc-answer', {
+      room,
+      from: socket.id,
+      answer
     });
   });
 
-  socket.on('webrtc-ice-candidate', (data) => {
-    console.log('WebRTC ICE candidate alındı:', data.targetSocketId, 'from:', socket.id);
-    socket.to(data.targetSocketId).emit('webrtc-ice-candidate', {
-      candidate: data.candidate,
-      fromSocketId: socket.id,
-      userName: data.userName
+  // ICE CANDIDATE: { room, to, from, candidate }
+  socket.on('webrtc-ice-candidate', ({ room, to, candidate }) => {
+    if (!room || !candidate || !to) return;
+    io.to(to).emit('webrtc-ice-candidate', {
+      room,
+      from: socket.id,
+      candidate
     });
   });
 
-  // Medya durumu güncelleme
-  socket.on('media-status-update', (data) => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-media-updated', {
-        socketId: socket.id,
-        userName: data.userName,
-        hasVideo: data.hasVideo,
-        hasAudio: data.hasAudio,
-        isScreenSharing: data.isScreenSharing
+  // Bağlantı koptuğunda
+  socket.on('disconnect', () => {
+    console.log('Bağlantı koptu:', socket.id);
+    const user = users[socket.id];
+    if (user) {
+      const room = user.room;
+      delete users[socket.id];
+
+      const roomUsers = getUsersInRoom(room);
+      io.to(room).emit('roomUsers', { room, users: roomUsers });
+
+      // WebRTC peer'lere bildir
+      socket.to(room).emit('peer-left', { id: socket.id });
+
+      // Sistem mesajı
+      io.to(room).emit('systemMessage', {
+        room,
+        text: `${user.name || 'Bir kullanıcı'} odadan ayrıldı`,
+        time: new Date().toISOString()
       });
-
-      // Sistem mesajı gönder
-      if (data.hasVideo && !data.isScreenSharing) {
-        sendSystemMessage(socket.roomCode, `${data.userName} kamerasını açtı`);
-      } else if (!data.hasVideo && !data.isScreenSharing) {
-        sendSystemMessage(socket.roomCode, `${data.userName} kamerasını kapattı`);
-      } else if (data.isScreenSharing) {
-        sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı başlattı`);
-      }
     }
-  });
-
-  // Yazıyor indikatörü
-  socket.on('typing-start', (data) => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-typing-start', data);
-    }
-  });
-
-  socket.on('typing-stop', (data) => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-typing-stop', data);
-    }
-  });
-
-  // Ses durumu güncelleme
-  socket.on('audio-state-change', (data) => {
-    if (socket.roomCode) {
-      const room = rooms.get(socket.roomCode);
-      if (room) {
-        const user = room.users.find(u => u.id === socket.id);
-        if (user) {
-          user.isMuted = data.isMuted;
-          io.to(socket.roomCode).emit('update-participants', room.users);
-        }
-      }
-      
-      socket.to(socket.roomCode).emit('audio-state-changed', {
-        userId: socket.id,
-        isMuted: data.isMuted,
-        userName: data.userName
-      });
-
-      // Sistem mesajı gönder
-      if (data.isMuted) {
-        sendSystemMessage(socket.roomCode, `${data.userName} mikrofonunu kapattı`);
-      } else {
-        sendSystemMessage(socket.roomCode, `${data.userName} mikrofonunu açtı`);
-      }
-    }
-  });
-
-  // Ekran paylaşımı
-  socket.on('screen-share-started', (data) => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-screen-sharing', {
-        userName: data.userName,
-        isSharing: true,
-        socketId: socket.id
-      });
-      sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı başlattı`);
-    }
-  });
-
-  socket.on('screen-share-stopped', (data) => {
-    if (socket.roomCode) {
-      socket.to(socket.roomCode).emit('user-screen-sharing', {
-        userName: data.userName,
-        isSharing: false,
-        socketId: socket.id
-      });
-      sendSystemMessage(socket.roomCode, `${data.userName} ekran paylaşımı durdurdu`);
-    }
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('Kullanıcı ayrıldı:', socket.id, reason);
-    
-    if (socket.roomCode && rooms.has(socket.roomCode)) {
-      const room = rooms.get(socket.roomCode);
-      const userIndex = room.users.findIndex(u => u.id === socket.id);
-      
-      if (userIndex !== -1) {
-        const user = room.users[userIndex];
-        room.users.splice(userIndex, 1);
-        
-        // Tüm kullanıcılara ayrılan kullanıcıyı bildir
-        socket.to(socket.roomCode).emit('user-disconnected', {
-          socketId: socket.id,
-          userName: user.name
-        });
-        
-        socket.to(socket.roomCode).emit('user-left', {
-          userName: user.name,
-          participants: room.users,
-          socketId: socket.id
-        });
-        
-        io.to(socket.roomCode).emit('update-participants', room.users);
-        
-        // Sistem mesajı gönder
-        sendSystemMessage(socket.roomCode, `${user.name} odadan ayrıldı`);
-        
-        if (room.users.length === 0) {
-          room.lastActivity = new Date();
-        }
-        
-        updateStats();
-      }
-    }
-    
-    userSessions.delete(socket.id);
-    socketRateLimitMap.delete(socket.id);
   });
 });
 
-// Stats güncelleme fonksiyonu
-function updateStats() {
-  const stats = {
-    roomCount: Array.from(rooms.values()).filter(room => room.users.length > 0).length,
-    totalUsers: Array.from(rooms.values()).reduce((acc, room) => acc + room.users.length, 0),
-    totalConnections: userSessions.size,
-    serverTime: new Date().toISOString()
-  };
-  io.emit('stats-updated', stats);
-}
-
-// Temizleme interval'leri
-setInterval(cleanupInactiveRooms, 30 * 60 * 1000);
-setInterval(() => {
-  const now = Date.now();
-  for (const [socketId, limit] of socketRateLimitMap.entries()) {
-    if (now - limit.firstEvent > 60000) {
-      socketRateLimitMap.delete(socketId);
-    }
-  }
-}, 60000);
-
-// Sunucuyu başlat
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`SyncVibe sunucusu ${PORT} portunda başlatıldı`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM alındı, sunucu kapatılıyor...');
-  server.close(() => {
-    console.log('Sunucu kapatıldı');
-    process.exit(0);
-  });
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`SyncVibe sunucu çalışıyor: http://localhost:${PORT}`);
 });
