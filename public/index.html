@@ -1,0 +1,1697 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>SyncVibe | YavuzSOFT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    body {
+      background: #f3f4f6;
+      color: #111827;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .navbar {
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06);
+    }
+    .navbar-brand {
+      color: #111827 !important;
+    }
+    .navbar-brand span {
+      font-size: 0.75rem;
+      color: #6b7280;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .hero {
+      padding: 5rem 0 3rem;
+    }
+    .hero-title {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #111827;
+    }
+    .hero-subtitle {
+      color: #4b5563;
+    }
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e5edff;
+      color: #2563eb;
+      font-size: 1.5rem;
+    }
+    .card-soft {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+    }
+    .chat-wrapper {
+      background: #ffffff;
+      border-radius: 1.2rem;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+      min-height: 460px;
+    }
+    .chat-sidebar {
+      background: #f9fafb;
+      border-right: 1px solid #e5e7eb;
+      height: 100%;
+    }
+    .chat-sidebar .list-group-item {
+      background: transparent;
+      border: 0;
+      border-radius: .75rem;
+      color: #374151;
+      cursor: pointer;
+    }
+    .chat-sidebar .list-group-item.active {
+      background: #e5e7eb;
+    }
+    .chat-header {
+      padding: .9rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+    }
+    .chat-body {
+      padding: 1rem;
+      height: 260px;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+    .message {
+      max-width: 80%;
+      padding: .6rem .9rem;
+      border-radius: .75rem;
+      margin-bottom: .4rem;
+      font-size: .9rem;
+    }
+    .message.me {
+      margin-left: auto;
+      background: #2563eb;
+      color: #ffffff;
+      border-bottom-right-radius: .15rem;
+    }
+    .message.other {
+      background: #e5edff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+      border-bottom-left-radius: .15rem;
+    }
+    .chat-input {
+      border-top: 1px solid #e5e7eb;
+      padding: .6rem .8rem;
+      background: #f9fafb;
+    }
+    .chat-input .form-control {
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      color: #111827;
+    }
+    .chat-input .form-control:focus {
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.6);
+      border-color: #2563eb;
+    }
+    footer {
+      border-top: 1px solid #e5e7eb;
+      margin-top: 3rem;
+      padding: 1rem 0;
+      color: #6b7280;
+      font-size: .85rem;
+      background: #ffffff;
+    }
+    #joinScreen {
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+    /* Remote videolar için grid layout */
+    #remoteVideos {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 6px;
+      align-items: stretch;
+    }
+    #remoteVideos > .remote-wrapper {
+      width: 100%;
+      height: 100%;
+    }
+    #remoteVideos video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Speaker view (aktif konuşan veya manuel sabitlenen kullanıcı büyütme) */
+    #remoteVideos.speaker-view-active {
+      grid-auto-rows: 120px;
+    }
+    .remote-wrapper.remote-speaker-main {
+      grid-column: 1 / -1;
+      min-height: 220px;
+    }
+    .remote-wrapper.remote-speaker-secondary {
+      opacity: 0.85;
+    }
+    .remote-wrapper.remote-speaker-main video {
+      object-fit: contain;
+      background: #000;
+    }
+
+    /* Yerel kamera PIP (küçük kutu) */
+    #localVideo {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 25%;
+      max-width: 180px;
+      border-radius: .5rem;
+      border: 1px solid rgba(15,23,42,.25);
+      background: #000;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+
+<!-- GİRİŞ / ODA SEÇİM EKRANI -->
+<div id="joinScreen" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index:1050;">
+  <div class="card card-soft p-4" style="max-width:420px; width:100%;">
+    <h5 class="mb-3 text-center">SyncVibe'ye Katıl</h5>
+    <form id="joinForm" class="d-flex flex-column gap-3">
+      <div>
+        <label class="form-label small text-secondary mb-1" for="joinName">Kullanıcı adın</label>
+        <input type="text" id="joinName" class="form-control form-control-sm" placeholder="Örn: Yavuz">
+      </div>
+      <div>
+        <label class="form-label small text-secondary mb-1" for="joinRoom">
+          Oda kodu <span class="text-muted">(boş bırak = yeni oda oluştur)</span>
+        </label>
+        <input type="text" id="joinRoom" class="form-control form-control-sm" placeholder="Örn: A3C9FQ (boş bırak = yeni)">
+      </div>
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="fa-solid fa-right-to-bracket me-1"></i> Odaya Gir
+      </button>
+      <small class="text-secondary text-center">
+        Oda kodu boş bırakılırsa rastgele bir oda kodu oluşturulur.
+        Bu kodu arkadaşlarınla paylaşarak aynı odaya girebilirsiniz.
+      </small>
+    </form>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-light sticky-top border-bottom border-light">
+  <div class="container">
+    <a class="navbar-brand d-flex flex-column fw-bold" href="#">
+      SyncVibe
+      <span>YavuzSOFT</span>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link active" href="#hero">Anasayfa</a></li>
+        <li class="nav-item"><a class="nav-link" href="#ozellikler">Özellikler</a></li>
+        <li class="nav-item"><a class="nav-link" href="#uygulama">Uygulama</a></li>
+        <li class="nav-item"><a class="nav-link" href="#iletisim">İletişim</a></li>
+      </ul>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="navbar-text small text-secondary d-none d-lg-inline">
+          <i class="fa-solid fa-user me-1"></i>
+          <span id="currentUserName">Misafir</span>
+        </span>
+        <button class="btn btn-sm btn-outline-primary" id="openJoinScreenBtn">
+          <i class="fa-solid fa-right-to-bracket me-1"></i> Odayı Değiştir
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero" class="hero">
+  <div class="container">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-6">
+        <h1 class="hero-title mb-3">
+          Sesli, yazılı ve görüntülü<br>iletişim tek platformda.
+        </h1>
+        <p class="hero-subtitle mb-4">
+          SyncVibe ile arkadaşların, ekibin ve topluluğunla aynı anda
+          metin, ses ve video üzerinden güvenli bir şekilde iletişim kur.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <a href="#uygulama" class="btn btn-primary btn-lg">
+            <i class="fa-solid fa-play me-2"></i> Hemen Başla
+          </a>
+          <a href="#ozellikler" class="btn btn-outline-secondary btn-lg">
+            <i class="fa-solid fa-circle-info me-2"></i> Daha Fazla Bilgi
+          </a>
+        </div>
+
+        <div class="d-flex align-items-center gap-3 mt-3 text-muted">
+          <div class="d-flex align-items-center gap-1">
+            <i class="fa-solid fa-shield-halved text-success"></i>
+            <small>Uçtan uca şifreleme (planlanıyor)</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <!-- Ana arayüz kartı -->
+        <div class="chat-wrapper">
+          <div class="row g-0">
+            <!-- SOL: Kanallar + kullanıcı listesi -->
+            <div class="col-md-4 chat-sidebar p-2">
+              <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+                <span class="small text-secondary text-uppercase">Kanallar</span>
+                <button class="btn btn-sm btn-outline-secondary border-0">
+                  <i class="fa-solid fa-plus"></i>
+                </button>
+              </div>
+
+              <div class="list-group small mb-2">
+                <button class="list-group-item d-flex align-items-center gap-2 channel-btn active" data-channel="genel">
+                  <i class="fa-solid fa-hashtag text-primary"></i>
+                  <span>genel-sohbet</span>
+                </button>
+                <button class="list-group-item d-flex align-items-center gap-2 channel-btn" data-channel="ses">
+                  <i class="fa-solid fa-headset text-success"></i>
+                  <span>ses-kanalı-1</span>
+                </button>
+                <button class="list-group-item d-flex align-items-center gap-2 channel-btn" data-channel="video">
+                  <i class="fa-solid fa-video text-danger"></i>
+                  <span>toplanti-odasi</span>
+                </button>
+              </div>
+
+              <hr class="my-2">
+              <div class="small text-secondary text-uppercase px-1 mb-1">Odadaki Kullanıcılar</div>
+              <ul class="list-unstyled small mb-0" id="roomUsersList">
+                <!-- JS ile doldurulacak -->
+              </ul>
+            </div>
+
+            <!-- SAĞ: Aktif sohbet -->
+            <div class="col-md-8 d-flex flex-column">
+              <div class="chat-header">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-hashtag text-primary"></i>
+                  <div>
+                    <div class="small fw-semibold d-flex align-items-center gap-2">
+                      <span>Oda kodu: <span id="currentRoomName">-</span></span>
+
+                      <!-- Oda kodunu kopyala -->
+                      <button type="button"
+                              class="btn btn-link btn-sm text-secondary p-0"
+                              id="copyRoomBtn"
+                              title="Oda kodunu kopyala">
+                        <i class="fa-regular fa-copy"></i>
+                      </button>
+                      <small id="copyRoomMsg" class="text-success d-none">Kopyalandı</small>
+
+                      <!-- Davet linkini kopyala -->
+                      <button type="button"
+                              class="btn btn-link btn-sm text-secondary p-0"
+                              id="copyInviteBtn"
+                              title="Davet linkini kopyala">
+                        <i class="fa-solid fa-link"></i>
+                      </button>
+                      <small id="copyInviteMsg" class="text-success d-none">Davet linki kopyalandı</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                      <small class="text-secondary" id="currentChannelLabel">Kanal: genel-sohbet</small>
+                      <span id="callStatusBadge"
+                            class="badge rounded-pill bg-success-subtle text-success border border-success d-none">
+                        Görüşme aktif
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <button class="btn btn-sm btn-outline-secondary" id="voiceCallBtn" title="Sesli Arama">
+                    <i class="fa-solid fa-phone"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" id="videoCallBtn" title="Görüntülü Arama">
+                    <i class="fa-solid fa-video"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary d-none"
+                          id="toggleMicBtn"
+                          title="Mikrofonu aç/kapat">
+                    <i id="toggleMicIcon" class="fa-solid fa-microphone"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary d-none"
+                          id="toggleCamBtn"
+                          title="Kamerayı aç/kapat">
+                    <i id="toggleCamIcon" class="fa-solid fa-video"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" id="screenShareBtn" title="Ekran Paylaş">
+                    <i class="fa-solid fa-display"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" title="Ayarlar">
+                    <i class="fa-solid fa-gear"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="chat-body" id="chatMessages">
+                <!-- Mesajlar JS ile eklenecek -->
+              </div>
+
+              <div class="chat-input">
+                <div class="d-flex align-items-center gap-2">
+                  <button class="btn btn-sm btn-outline-secondary" title="Emoji">
+                    <i class="fa-regular fa-face-smile"></i>
+                  </button>
+                  <input type="text" id="chatMessageInput" class="form-control form-control-sm" placeholder="Mesaj yaz...">
+                  <button class="btn btn-sm btn-outline-secondary" title="Ses Kaydı Başlat">
+                    <i class="fa-solid fa-microphone"></i>
+                  </button>
+                  <button class="btn btn-sm btn-primary" id="chatSendBtn" title="Gönder">
+                    <i class="fa-solid fa-paper-plane"></i>
+                  </button>
+                </div>
+                <!-- Yazıyor göstergesi -->
+                <div id="typingIndicator" class="small text-muted mt-1 d-none"></div>
+              </div>
+            </div><!-- /col-md-8 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ÖZELLİKLER -->
+<section id="ozellikler" class="py-5">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="fw-bold">SyncVibe Özellikleri</h2>
+      <p class="text-secondary mb-0">
+        Takım içi toplantılar, arkadaş sohbetleri ve topluluk buluşmaları için tasarlandı.
+      </p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card card-soft h-100 p-3">
+          <div class="feature-icon mb-3">
+            <i class="fa-solid fa-comments"></i>
+          </div>
+          <h5>Yazılı Sohbet</h5>
+          <p class="text-secondary small mb-0">
+            Kanallar, direkt mesajlar ve grup sohbetleri ile organize, hızlı ve güvenli yazılı iletişim.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-soft h-100 p-3">
+          <div class="feature-icon mb-3">
+            <i class="fa-solid fa-microphone-lines"></i>
+          </div>
+          <h5>Sesli Konuşma</h5>
+          <p class="text-secondary small mb-0">
+            Düşük gecikmeli ses kanalları ile oyun oynarken, toplantı yaparken veya arkadaşlarınla sohbet ederken kristal netliğinde ses.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-soft h-100 p-3">
+          <div class="feature-icon mb-3">
+            <i class="fa-solid fa-video"></i>
+          </div>
+          <h5>Görüntülü Konuşma</h5>
+          <p class="text-secondary small mb-0">
+            Tekli ve çoklu görüntülü görüşme, ekran paylaşımı ve sunum desteği ile uzaktan birlikte çalışma.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- UYGULAMA -->
+<section id="uygulama" class="py-5">
+  <div class="container">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-5">
+        <h2 class="fw-bold mb-3">Tek tıkla mod değiştir</h2>
+        <p class="text-secondary">
+          Aynı oda içinde yazılı sohbetten sesli aramaya, oradan da görüntülü toplantıya geç.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button class="btn btn-outline-secondary">
+            <i class="fa-solid fa-comments me-2"></i> Yazılı Sohbet
+          </button>
+          <button class="btn btn-outline-success">
+            <i class="fa-solid fa-phone me-2"></i> Sesli Çağrı
+          </button>
+          <button class="btn btn-outline-danger">
+            <i class="fa-solid fa-video me-2"></i> Görüntülü Çağrı
+          </button>
+        </div>
+
+        <ul class="text-secondary small mb-0">
+          <li>Kullanıcı durumları (çevrimiçi, meşgul, görünmez) – eklenecek</li>
+          <li>Özel odalar ve davet linkleri</li>
+          <li>Mobil ve masaüstü uyumlu tasarım</li>
+        </ul>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card card-soft p-3 h-100">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="small"><i class="fa-solid fa-phone text-success me-1"></i> Sesli Çağrı</span>
+                <span class="badge rounded-pill bg-success-subtle text-success border border-success">
+                  Canlı
+                </span>
+              </div>
+              <div class="text-center py-3">
+                <i class="fa-solid fa-user fa-2x text-secondary"></i>
+                <p class="small text-secondary mt-2 mb-1">YavuzSOFT • 02:13</p>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                  <button class="btn btn-sm btn-outline-secondary">
+                    <i class="fa-solid fa-microphone-slash"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary">
+                    <i class="fa-solid fa-volume-high"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger">
+                    <i class="fa-solid fa-phone-slash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="card card-soft p-3 h-100">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="small"><i class="fa-solid fa-video text-danger me-1"></i> Görüntülü Çağrı</span>
+                <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary">
+                  Önizleme
+                </span>
+              </div>
+              <div class="ratio ratio-16x9 mb-2"
+                   style="background:#e5e7eb; border-radius:.75rem; overflow:hidden; position:relative;">
+                <!-- Çoklu remote video + speaker view -->
+                <div id="remoteVideos" style="width:100%; height:100%;"></div>
+                <!-- Yerel kamera PIP -->
+                <video id="localVideo"
+                       autoplay
+                       muted
+                       playsinline></video>
+              </div>
+              <div class="d-flex justify-content-between">
+                <button class="btn btn-sm btn-outline-secondary">
+                  <i class="fa-solid fa-display"></i> Ekran Paylaş
+                </button>
+                <button class="btn btn-sm btn-outline-secondary">
+                  <i class="fa-solid fa-arrows-up-down-left-right"></i> Izgara Görünüm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div><!-- /row -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- İLETİŞİM / FOOTER -->
+<section id="iletisim" class="pb-4">
+  <div class="container">
+    <div class="card card-soft p-3">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-6">
+          <h5 class="mb-1">SyncVibe geliştirme aşamasında</h5>
+          <p class="text-secondary small mb-0">
+            Önerilerin, hata bildirimlerin veya iş birliği taleplerin için aşağıdaki
+            iletişim kanallarından YavuzSOFT ekibiyle iletişime geçebilirsin.
+          </p>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <a href="mailto:info@yavuzsoft.com" class="btn btn-outline-secondary btn-sm me-2">
+            <i class="fa-solid fa-envelope me-1"></i> E-posta
+          </a>
+          <a href="#" class="btn btn-outline-primary btn-sm">
+            <i class="fa-brands fa-discord me-1"></i> Discord Sunucusu
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container d-flex flex-wrap justify-content-between align-items-center">
+    <span>© 2025 YavuzSOFT · SyncVibe</span>
+    <div class="d-flex gap-3">
+      <a href="#" class="text-secondary text-decoration-none small">
+        <i class="fa-brands fa-github"></i> GitHub
+      </a>
+      <a href="#" class="text-secondary text-decoration-none small">
+        <i class="fa-brands fa-x-twitter"></i> X
+      </a>
+    </div>
+  </div>
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Socket.IO istemci -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+  // Oda kodu (paylaşılan), kanal ve gerçek Socket.IO oda ismi
+  let ROOM_CODE       = null;         // Örn: ABC123
+  let CURRENT_CHANNEL = 'genel';      // 'genel' | 'ses' | 'video'
+  let ROOM_NAME       = null;         // Örn: ABC123:genel
+
+  let USER_NAME  = null;
+  let hasJoined  = false;
+
+  const socket = io();
+
+  // Çoklu WebRTC için
+  const peers = {};                // remoteSocketId -> RTCPeerConnection
+  const remoteVideoElements = {};  // remoteSocketId -> HTMLVideoElement
+  const remoteWrappers      = {};  // remoteSocketId -> wrapper div
+
+  // Speaker view: manuel pin + otomatik aktif konuşan
+  let manualPinnedPeerId  = null;
+  let autoActiveSpeakerId = null;
+
+  let currentRoomUsers = [];       // [{id, name}, ...]
+
+  // Audio seviye analizi için
+  let audioContext = null;
+  const remoteAudioAnalysers = {}; // remoteId -> { analyser, dataArray, source }
+  let volumeMonitorRaf = null;
+
+  // Bildirim / odak takibi
+  let windowFocused   = true;
+  let unreadCount     = 0;
+  const originalTitle = document.title;
+
+  window.addEventListener('focus', () => {
+    windowFocused = true;
+    unreadCount = 0;
+    document.title = originalTitle;
+  });
+
+  window.addEventListener('blur', () => {
+    windowFocused = false;
+  });
+
+  // DOM
+  const joinScreenEl      = document.getElementById('joinScreen');
+  const joinFormEl        = document.getElementById('joinForm');
+  const joinNameEl        = document.getElementById('joinName');
+  const joinRoomEl        = document.getElementById('joinRoom');
+  const openJoinScreenBtn = document.getElementById('openJoinScreenBtn');
+
+  const navUserNameEl     = document.getElementById('currentUserName');
+  const roomNameEl        = document.getElementById('currentRoomName');
+
+  const copyRoomBtn       = document.getElementById('copyRoomBtn');
+  const copyRoomMsg       = document.getElementById('copyRoomMsg');
+  const copyInviteBtn     = document.getElementById('copyInviteBtn');
+  const copyInviteMsg     = document.getElementById('copyInviteMsg');
+
+  const callStatusBadge   = document.getElementById('callStatusBadge');
+  const currentChannelLabelEl = document.getElementById('currentChannelLabel');
+
+  const chatMessagesEl    = document.getElementById('chatMessages');
+  const chatInputEl       = document.getElementById('chatMessageInput');
+  const chatSendBtnEl     = document.getElementById('chatSendBtn');
+  const voiceCallBtnEl    = document.getElementById('voiceCallBtn');
+  const videoCallBtnEl    = document.getElementById('videoCallBtn');
+  const localVideoEl      = document.getElementById('localVideo');
+  const remoteVideosContainer = document.getElementById('remoteVideos');
+  const roomUsersListEl   = document.getElementById('roomUsersList');
+
+  const toggleMicBtn      = document.getElementById('toggleMicBtn');
+  const toggleCamBtn      = document.getElementById('toggleCamBtn');
+  const toggleMicIcon     = document.getElementById('toggleMicIcon');
+  const toggleCamIcon     = document.getElementById('toggleCamIcon');
+  const screenShareBtnEl  = document.getElementById('screenShareBtn');
+
+  const channelButtons    = document.querySelectorAll('.channel-btn');
+  const typingIndicatorEl = document.getElementById('typingIndicator');
+
+  // Kanal isimleri (gösterilecek)
+  const CHANNEL_LABELS = {
+    genel: 'genel-sohbet',
+    ses: 'ses-kanalı-1',
+    video: 'toplanti-odasi'
+  };
+
+  // Yazıyor göstergesi durumu
+  const typingUsers = new Set();
+  let isTyping = false;
+  let typingTimeout = null;
+
+  // WebRTC - yerel medya durumları
+  let localStream         = null;  // Peerlere gönderilen akış (ses + seçilen video)
+  let micTrack            = null;  // Mikrofon track'i
+  let cameraTrack         = null;  // Kamera video track'i
+  let screenTrack         = null;  // Ekran paylaşımı track'i
+  let cameraPreviewStream = null;  // PIP için sadece kamera stream'i
+
+  let callActive          = false;
+  let currentCallHasVideo = false;
+  let isScreenSharing     = false;
+  let canRevertToCamera   = false;
+
+  const rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' }
+    ]
+  };
+
+  // URL parametrelerinden oda/kanal/isim okuma
+  const urlParams   = new URLSearchParams(window.location.search);
+  const urlRoom     = urlParams.get('room');
+  const urlChannel  = urlParams.get('channel');
+  const urlName     = urlParams.get('name');
+  const urlAutoJoin = urlParams.get('auto') === '1';
+
+  let DEFAULT_CHANNEL = 'genel';
+  if (urlChannel && ['genel', 'ses', 'video'].includes(urlChannel)) {
+    DEFAULT_CHANNEL = urlChannel;
+  }
+
+  if (urlName) {
+    joinNameEl.value = urlName;
+  }
+  if (urlRoom) {
+    joinRoomEl.value = urlRoom.toUpperCase();
+  }
+
+  function generateRoomCode(length = 6) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  function updateRoomName() {
+    ROOM_NAME = ROOM_CODE ? `${ROOM_CODE}:${CURRENT_CHANNEL}` : null;
+  }
+
+  function formatTime(isoString) {
+    try {
+      const date = isoString ? new Date(isoString) : new Date();
+      return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }
+
+  function updateCallStatusUI() {
+    if (callActive) {
+      callStatusBadge.classList.remove('d-none');
+      callStatusBadge.textContent = currentCallHasVideo
+        ? 'Görüntülü görüşme aktif'
+        : 'Sesli görüşme aktif';
+    } else {
+      callStatusBadge.classList.add('d-none');
+    }
+  }
+
+  function updateMediaButtonsUI() {
+    if (!localStream || !callActive) {
+      toggleMicBtn.classList.add('d-none');
+      toggleCamBtn.classList.add('d-none');
+      return;
+    }
+
+    if (micTrack) {
+      toggleMicBtn.classList.remove('d-none');
+      const micEnabled  = micTrack.enabled;
+      toggleMicIcon.className = 'fa-solid ' + (micEnabled ? 'fa-microphone' : 'fa-microphone-slash text-danger');
+    } else {
+      toggleMicBtn.classList.add('d-none');
+    }
+
+    // Kamera: sadece kamera varsa ve ekran paylaşımı yoksa göster
+    if (cameraTrack && !isScreenSharing) {
+      toggleCamBtn.classList.remove('d-none');
+      const camEnabled = cameraTrack.enabled;
+      toggleCamIcon.className = 'fa-solid ' + (camEnabled ? 'fa-video' : 'fa-video-slash text-danger');
+    } else {
+      toggleCamBtn.classList.add('d-none');
+    }
+  }
+
+  function updateScreenShareButtonUI() {
+    if (!screenShareBtnEl) return;
+
+    if (!callActive) {
+      screenShareBtnEl.disabled = true;
+      screenShareBtnEl.classList.add('disabled');
+      screenShareBtnEl.classList.remove('btn-danger');
+      screenShareBtnEl.classList.add('btn-outline-secondary');
+      screenShareBtnEl.innerHTML = '<i class="fa-solid fa-display"></i>';
+      return;
+    }
+
+    screenShareBtnEl.disabled = false;
+    screenShareBtnEl.classList.remove('disabled');
+
+    if (isScreenSharing) {
+      screenShareBtnEl.classList.remove('btn-outline-secondary');
+      screenShareBtnEl.classList.add('btn-danger');
+      screenShareBtnEl.title = 'Ekran paylaşımını durdur';
+      screenShareBtnEl.innerHTML = '<i class="fa-solid fa-display"></i>';
+    } else {
+      screenShareBtnEl.classList.remove('btn-danger');
+      screenShareBtnEl.classList.add('btn-outline-secondary');
+      screenShareBtnEl.title = 'Ekran Paylaş';
+      screenShareBtnEl.innerHTML = '<i class="fa-solid fa-display"></i>';
+    }
+  }
+
+  function setActiveChannelButton(channel) {
+    channelButtons.forEach(b => {
+      if (b.dataset.channel === channel) {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
+    currentChannelLabelEl.textContent = 'Kanal: ' + (CHANNEL_LABELS[channel] || channel);
+  }
+
+  setActiveChannelButton(DEFAULT_CHANNEL);
+  updateScreenShareButtonUI();
+
+  // ---- ODAYA GİRİŞ ----
+
+  joinFormEl.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const nameInput = joinNameEl.value.trim();
+    let roomInput   = joinRoomEl.value.trim().toUpperCase();
+
+    USER_NAME = nameInput || 'Misafir';
+
+    if (!roomInput) {
+      roomInput = generateRoomCode(6);
+    }
+    ROOM_CODE       = roomInput;
+    CURRENT_CHANNEL = DEFAULT_CHANNEL;
+    updateRoomName();
+    setActiveChannelButton(CURRENT_CHANNEL);
+
+    navUserNameEl.textContent      = USER_NAME;
+    roomNameEl.textContent         = ROOM_CODE;
+    copyRoomMsg.classList.add('d-none');
+    copyInviteMsg.classList.add('d-none');
+
+    endCall();
+
+    socket.emit('joinRoom', {
+      room: ROOM_NAME,
+      user: USER_NAME
+    });
+    hasJoined = true;
+
+    chatMessagesEl.innerHTML  = '';
+    roomUsersListEl.innerHTML = '';
+    typingUsers.clear();
+    updateTypingIndicator();
+    isTyping = false;
+    clearTimeout(typingTimeout);
+
+    joinScreenEl.classList.add('d-none');
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  });
+
+  if (urlRoom && urlAutoJoin) {
+    setTimeout(() => {
+      joinFormEl.dispatchEvent(new Event('submit', { cancelable: true }));
+    }, 0);
+  }
+
+  openJoinScreenBtn.addEventListener('click', () => {
+    joinScreenEl.classList.remove('d-none');
+  });
+
+  // ---- KANAL DEĞİŞTİRME ----
+
+  channelButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!hasJoined || !ROOM_CODE) {
+        alert('Önce bir odaya katılmalısın.');
+        return;
+      }
+      const newChannel = btn.dataset.channel;
+      if (!newChannel || newChannel === CURRENT_CHANNEL) return;
+
+      CURRENT_CHANNEL = newChannel;
+      DEFAULT_CHANNEL = newChannel;
+      updateRoomName();
+      setActiveChannelButton(CURRENT_CHANNEL);
+
+      endCall();
+      socket.emit('joinRoom', {
+        room: ROOM_NAME,
+        user: USER_NAME || 'Misafir'
+      });
+      chatMessagesEl.innerHTML = '';
+      typingUsers.clear();
+      updateTypingIndicator();
+      isTyping = false;
+      clearTimeout(typingTimeout);
+    });
+  });
+
+  // ---- ODA KODU / DAVET LİNKİ KOPYALA ----
+
+  copyRoomBtn.addEventListener('click', async () => {
+    if (!ROOM_CODE) return;
+    try {
+      await navigator.clipboard.writeText(ROOM_CODE);
+      copyRoomMsg.classList.remove('d-none');
+      setTimeout(() => copyRoomMsg.classList.add('d-none'), 1500);
+    } catch (err) {
+      console.error('Kopyalama hatası:', err);
+      alert('Oda kodu: ' + ROOM_CODE);
+    }
+  });
+
+  copyInviteBtn.addEventListener('click', async () => {
+    if (!ROOM_CODE) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', ROOM_CODE);
+    url.searchParams.set('channel', CURRENT_CHANNEL);
+    if (USER_NAME) url.searchParams.set('name', USER_NAME);
+    url.searchParams.set('auto', '1');
+
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      copyInviteMsg.classList.remove('d-none');
+      setTimeout(() => copyInviteMsg.classList.add('d-none'), 1500);
+    } catch (err) {
+      console.error('Davet linki kopyalanamadı:', err);
+      alert('Davet linki: ' + url.toString());
+    }
+  });
+
+  // ---- METİN SOHBETİ ----
+
+  function appendMessage({ user, text, from, time }) {
+    const isMe = (from === socket.id);
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('message', isMe ? 'me' : 'other');
+
+    const headerDiv = document.createElement('div');
+    headerDiv.classList.add('d-flex', 'justify-content-between', 'align-items-center', 'mb-1');
+
+    const nameSpan = document.createElement('strong');
+    nameSpan.textContent = user || (isMe ? 'Ben' : 'Kullanıcı');
+
+    const timeSmall = document.createElement('small');
+    timeSmall.classList.add('text-muted', 'ms-2');
+    timeSmall.textContent = formatTime(time);
+
+    headerDiv.appendChild(nameSpan);
+    headerDiv.appendChild(timeSmall);
+
+    const textDiv = document.createElement('div');
+    textDiv.textContent = text;
+
+    msgDiv.appendChild(headerDiv);
+    msgDiv.appendChild(textDiv);
+    chatMessagesEl.appendChild(msgDiv);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  function appendSystemMessage(text, time) {
+    const div = document.createElement('div');
+    div.classList.add('text-center', 'text-muted', 'small', 'my-2');
+    div.textContent = `[${formatTime(time)}] ${text}`;
+    chatMessagesEl.appendChild(div);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  chatSendBtnEl.addEventListener('click', sendChat);
+  chatInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+
+  function sendChat() {
+    if (!hasJoined || !ROOM_NAME) {
+      alert('Önce bir odaya katılmalısın.');
+      return;
+    }
+
+    const text = chatInputEl.value.trim();
+    if (!text) return;
+
+    socket.emit('chatMessage', {
+      room: ROOM_NAME,
+      user: USER_NAME || 'Misafir',
+      text
+    });
+    chatInputEl.value = '';
+
+    if (isTyping) {
+      isTyping = false;
+      clearTimeout(typingTimeout);
+      socket.emit('stopTyping', {
+        room: ROOM_NAME,
+        user: USER_NAME || 'Misafir'
+      });
+    }
+  }
+
+  chatInputEl.addEventListener('input', () => {
+    if (!hasJoined || !ROOM_NAME) return;
+
+    if (!isTyping) {
+      isTyping = true;
+      socket.emit('typing', {
+        room: ROOM_NAME,
+        user: USER_NAME || 'Misafir'
+      });
+    }
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      if (!isTyping) return;
+      isTyping = false;
+      socket.emit('stopTyping', {
+        room: ROOM_NAME,
+        user: USER_NAME || 'Misafir'
+      });
+    }, 1000);
+  });
+
+  function updateTypingIndicator() {
+    if (typingUsers.size === 0) {
+      typingIndicatorEl.classList.add('d-none');
+      typingIndicatorEl.textContent = '';
+      return;
+    }
+    const names = Array.from(typingUsers);
+    let text;
+    if (names.length === 1) {
+      text = `${names[0]} yazıyor...`;
+    } else if (names.length === 2) {
+      text = `${names[0]} ve ${names[1]} yazıyor...`;
+    } else {
+      text = `${names[0]} ve ${names.length - 1} kişi daha yazıyor...`;
+    }
+    typingIndicatorEl.textContent = text;
+    typingIndicatorEl.classList.remove('d-none');
+  }
+
+  socket.on('chatMessage', (data) => {
+    const isMe = data.from === socket.id;
+
+    if (!isMe && !windowFocused) {
+      unreadCount++;
+      document.title = `(${unreadCount}) ${originalTitle}`;
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(data.user || 'Yeni mesaj', {
+          body: data.text || '',
+          tag: 'syncvibe-message'
+        });
+      }
+    }
+
+    appendMessage(data);
+  });
+
+  socket.on('systemMessage', ({ room, text, time }) => {
+    if (room !== ROOM_NAME) return;
+    appendSystemMessage(text, time);
+  });
+
+  socket.on('roomHistory', ({ room, messages }) => {
+    if (room !== ROOM_NAME) return;
+    chatMessagesEl.innerHTML = '';
+    messages.forEach(msg => appendMessage(msg));
+  });
+
+  // ---- ODA KULLANICI LİSTESİ ----
+
+  socket.on('roomUsers', ({ room, users }) => {
+    if (room !== ROOM_NAME) return;
+    roomUsersListEl.innerHTML = '';
+    currentRoomUsers = users || [];
+
+    users.forEach(u => {
+      const li = document.createElement('li');
+      li.classList.add('d-flex', 'align-items-center', 'gap-1', 'px-1', 'py-1');
+
+      const dot = document.createElement('i');
+      dot.className = 'fa-solid fa-circle text-success';
+      dot.style.fontSize = '0.55rem';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = u.name || 'Misafir';
+
+      li.appendChild(dot);
+      li.appendChild(nameSpan);
+      roomUsersListEl.appendChild(li);
+    });
+
+    typingUsers.forEach(name => {
+      const stillHere = users.some(u => u.name === name);
+      if (!stillHere) typingUsers.delete(name);
+    });
+    updateTypingIndicator();
+  });
+
+  socket.on('typing', ({ room, user }) => {
+    if (room !== ROOM_NAME) return;
+    if (!user || user === USER_NAME) return;
+    typingUsers.add(user);
+    updateTypingIndicator();
+  });
+
+  socket.on('stopTyping', ({ room, user }) => {
+    if (room !== ROOM_NAME) return;
+    if (!user) return;
+    typingUsers.delete(user);
+    updateTypingIndicator();
+  });
+
+  // ---- SPEAKER VIEW + AUDIO ANALİZ ----
+
+  function applySpeakerLayout() {
+    const activeId =
+      (manualPinnedPeerId && remoteWrappers[manualPinnedPeerId])
+        ? manualPinnedPeerId
+        : (autoActiveSpeakerId && remoteWrappers[autoActiveSpeakerId]
+            ? autoActiveSpeakerId
+            : null);
+
+    if (!activeId) {
+      remoteVideosContainer.classList.remove('speaker-view-active');
+      Object.values(remoteWrappers).forEach(w => {
+        w.classList.remove('remote-speaker-main', 'remote-speaker-secondary');
+      });
+      return;
+    }
+
+    remoteVideosContainer.classList.add('speaker-view-active');
+    Object.entries(remoteWrappers).forEach(([id, wrapper]) => {
+      wrapper.classList.remove('remote-speaker-main', 'remote-speaker-secondary');
+      if (id === String(activeId)) {
+        wrapper.classList.add('remote-speaker-main');
+      } else {
+        wrapper.classList.add('remote-speaker-secondary');
+      }
+    });
+  }
+
+  function setupAudioAnalyserForRemote(remoteId, stream) {
+    try {
+      if (!window.AudioContext && !window.webkitAudioContext) return;
+      if (!stream || !stream.getAudioTracks || stream.getAudioTracks().length === 0) return;
+
+      if (!audioContext) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AC();
+      }
+
+      const source   = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.fftSize);
+
+      source.connect(analyser);
+      audioContext.resume().catch(() => {});
+
+      remoteAudioAnalysers[remoteId] = { analyser, dataArray, source };
+
+      if (!volumeMonitorRaf) {
+        startVolumeMonitoring();
+      }
+    } catch (err) {
+      console.error('Audio analyser kurulurken hata:', err);
+    }
+  }
+
+  function startVolumeMonitoring() {
+    if (!audioContext) return;
+
+    const volumeThreshold   = 0.03;
+    const switchMinInterval = 1000; // ms
+    let lastSwitchTime      = performance.now();
+
+    function loop() {
+      if (!callActive || Object.keys(remoteAudioAnalysers).length === 0) {
+        stopVolumeMonitoring();
+        return;
+      }
+
+      let maxVolume = 0;
+      let loudestId = null;
+
+      for (const [id, obj] of Object.entries(remoteAudioAnalysers)) {
+        const { analyser, dataArray } = obj;
+        analyser.getByteTimeDomainData(dataArray);
+        let sumSquares = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sumSquares += v * v;
+        }
+        const rms = Math.sqrt(sumSquares / dataArray.length);
+        if (rms > maxVolume) {
+          maxVolume = rms;
+          loudestId = id;
+        }
+      }
+
+      const now = performance.now();
+      if (!manualPinnedPeerId && loudestId && maxVolume > volumeThreshold) {
+        if (autoActiveSpeakerId !== loudestId && now - lastSwitchTime > switchMinInterval) {
+          autoActiveSpeakerId = loudestId;
+          lastSwitchTime = now;
+          applySpeakerLayout();
+        }
+      }
+
+      volumeMonitorRaf = requestAnimationFrame(loop);
+    }
+
+    if (!volumeMonitorRaf) {
+      volumeMonitorRaf = requestAnimationFrame(loop);
+    }
+  }
+
+  function stopVolumeMonitoring() {
+    if (volumeMonitorRaf) {
+      cancelAnimationFrame(volumeMonitorRaf);
+      volumeMonitorRaf = null;
+    }
+    autoActiveSpeakerId = null;
+    applySpeakerLayout();
+  }
+
+  function attachRemoteStream(remoteId, stream) {
+    let video   = remoteVideoElements[remoteId];
+    let wrapper = remoteWrappers[remoteId];
+
+    if (!video) {
+      video = document.createElement('video');
+      video.autoplay  = true;
+      video.playsInline = true;
+      video.dataset.peerId = remoteId;
+
+      wrapper = document.createElement('div');
+      wrapper.classList.add('remote-wrapper', 'ratio', 'ratio-16x9');
+      wrapper.style.background   = '#e5e7eb';
+      wrapper.style.borderRadius = '.75rem';
+      wrapper.style.overflow     = 'hidden';
+      wrapper.appendChild(video);
+
+      wrapper.addEventListener('click', () => {
+        if (manualPinnedPeerId === remoteId) {
+          manualPinnedPeerId = null;
+        } else {
+          manualPinnedPeerId = remoteId;
+        }
+        applySpeakerLayout();
+      });
+
+      remoteVideosContainer.appendChild(wrapper);
+
+      remoteVideoElements[remoteId] = video;
+      remoteWrappers[remoteId]      = wrapper;
+    }
+
+    video.srcObject = stream;
+    setupAudioAnalyserForRemote(remoteId, stream);
+    applySpeakerLayout();
+  }
+
+  function detachRemoteStream(remoteId) {
+    const video   = remoteVideoElements[remoteId];
+    const wrapper = remoteWrappers[remoteId];
+
+    if (wrapper && wrapper.parentElement === remoteVideosContainer) {
+      remoteVideosContainer.removeChild(wrapper);
+    }
+    if (video) delete remoteVideoElements[remoteId];
+    if (wrapper) delete remoteWrappers[remoteId];
+
+    if (remoteAudioAnalysers[remoteId]) {
+      try {
+        remoteAudioAnalysers[remoteId].source.disconnect();
+      } catch (e) {}
+      delete remoteAudioAnalysers[remoteId];
+      if (Object.keys(remoteAudioAnalysers).length === 0) {
+        stopVolumeMonitoring();
+      }
+    }
+
+    if (manualPinnedPeerId === remoteId)  manualPinnedPeerId  = null;
+    if (autoActiveSpeakerId === remoteId) autoActiveSpeakerId = null;
+
+    applySpeakerLayout();
+  }
+
+  // ---- WEBRTC (çoklu peer + ekran paylaşımı + PIP) ----
+
+  async function createPeerConnectionFor(remoteId) {
+    const pc = new RTCPeerConnection(rtcConfig);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && ROOM_NAME) {
+        socket.emit('webrtc-ice-candidate', {
+          room: ROOM_NAME,
+          to: remoteId,
+          from: socket.id,
+          candidate: event.candidate
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      attachRemoteStream(remoteId, event.streams[0]);
+    };
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+    }
+
+    peers[remoteId] = pc;
+    return pc;
+  }
+
+  async function initLocalMedia(hasVideo) {
+    if (localStream) return;
+
+    if (hasVideo) {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true
+      });
+      micTrack    = localStream.getAudioTracks()[0] || null;
+      cameraTrack = localStream.getVideoTracks()[0] || null;
+      screenTrack = null;
+
+      if (cameraTrack) {
+        cameraPreviewStream = new MediaStream([cameraTrack]);
+        localVideoEl.srcObject = cameraPreviewStream;
+      } else {
+        cameraPreviewStream = null;
+        localVideoEl.srcObject = null;
+      }
+
+      callActive          = true;
+      currentCallHasVideo = !!cameraTrack;
+      canRevertToCamera   = !!cameraTrack;
+    } else {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false
+      });
+      micTrack    = localStream.getAudioTracks()[0] || null;
+      cameraTrack = null;
+      screenTrack = null;
+      cameraPreviewStream = null;
+      localVideoEl.srcObject = null;
+
+      callActive          = true;
+      currentCallHasVideo = false;
+      canRevertToCamera   = false;
+    }
+
+    updateCallStatusUI();
+    updateMediaButtonsUI();
+    updateScreenShareButtonUI();
+  }
+
+  async function startCall(isVideo) {
+    if (!hasJoined || !ROOM_NAME) {
+      alert('Önce bir odaya katılmalısın.');
+      return;
+    }
+
+    if (callActive) {
+      const confirmNew = confirm('Zaten aktif bir görüşme var. Yeni görüşme başlatmak için mevcut görüşmeyi sonlandırmak ister misin?');
+      if (!confirmNew) return;
+      endCall();
+    }
+
+    try {
+      await initLocalMedia(!!isVideo);
+
+      const targets = currentRoomUsers.filter(u => u.id !== socket.id);
+
+      if (!targets.length) {
+        alert('Odadaki diğer kullanıcılar bağlandığında çağrıya katılabilir.');
+      }
+
+      for (const user of targets) {
+        const pc = await createPeerConnectionFor(user.id);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        socket.emit('webrtc-offer', {
+          room: ROOM_NAME,
+          to: user.id,
+          from: socket.id,
+          offer,
+          hasVideo: !!cameraTrack
+        });
+      }
+    } catch (err) {
+      console.error('Çağrı başlatılamadı:', err);
+      alert('Kamera / mikrofon erişim hatası (tarayıcı izinlerini kontrol et).');
+    }
+  }
+
+  async function handleOffer({ from, offer, hasVideo }) {
+    if (!ROOM_NAME) return;
+
+    try {
+      await initLocalMedia(!!hasVideo);
+
+      let pc = peers[from];
+      if (!pc) {
+        pc = await createPeerConnectionFor(from);
+      }
+
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      callActive          = true;
+      currentCallHasVideo = currentCallHasVideo || !!hasVideo;
+      updateCallStatusUI();
+      updateMediaButtonsUI();
+      updateScreenShareButtonUI();
+
+      socket.emit('webrtc-answer', {
+        room: ROOM_NAME,
+        to: from,
+        from: socket.id,
+        answer
+      });
+    } catch (err) {
+      console.error('Teklif işlenirken hata:', err);
+    }
+  }
+
+  async function handleAnswer({ from, answer }) {
+    const pc = peers[from];
+    if (!pc) return;
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    } catch (err) {
+      console.error('Yanıt işlenirken hata:', err);
+    }
+  }
+
+  async function handleIceCandidate({ from, candidate }) {
+    const pc = peers[from];
+    if (!pc) return;
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (err) {
+      console.error('ICE eklenirken hata:', err);
+    }
+  }
+
+  function endCall() {
+    Object.values(peers).forEach(pc => pc.close());
+    for (const id in peers) {
+      delete peers[id];
+    }
+
+    for (const id in remoteVideoElements) {
+      detachRemoteStream(id);
+    }
+
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    if (cameraPreviewStream) {
+      cameraPreviewStream = null;
+    }
+    if (micTrack) {
+      micTrack.stop();
+      micTrack = null;
+    }
+    if (cameraTrack) {
+      cameraTrack.stop();
+      cameraTrack = null;
+    }
+    if (screenTrack) {
+      screenTrack.stop();
+      screenTrack = null;
+    }
+
+    localVideoEl.srcObject = null;
+
+    manualPinnedPeerId  = null;
+    autoActiveSpeakerId = null;
+    stopVolumeMonitoring();
+    for (const id in remoteAudioAnalysers) {
+      try {
+        remoteAudioAnalysers[id].source.disconnect();
+      } catch (e) {}
+      delete remoteAudioAnalysers[id];
+    }
+    if (audioContext) {
+      audioContext.close().catch(() => {});
+      audioContext = null;
+    }
+
+    isScreenSharing     = false;
+    canRevertToCamera   = false;
+    callActive          = false;
+    currentCallHasVideo = false;
+
+    updateCallStatusUI();
+    updateMediaButtonsUI();
+    updateScreenShareButtonUI();
+  }
+
+  async function startScreenShare() {
+    if (!callActive || !localStream) {
+      alert('Ekran paylaşımı için önce aktif bir çağrı başlatmalısın.');
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false
+      });
+
+      const newScreenTrack = screenStream.getVideoTracks()[0];
+      if (!newScreenTrack) return;
+
+      newScreenTrack.addEventListener('ended', () => {
+        if (isScreenSharing) {
+          stopScreenShare();
+        }
+      });
+
+      localStream.getVideoTracks().forEach(t => {
+        localStream.removeTrack(t);
+      });
+
+      screenTrack = newScreenTrack;
+      localStream.addTrack(screenTrack);
+
+      if (cameraTrack) {
+        if (!cameraPreviewStream) {
+          cameraPreviewStream = new MediaStream([cameraTrack]);
+        }
+        localVideoEl.srcObject = cameraPreviewStream;
+      } else {
+        localVideoEl.srcObject = null;
+      }
+
+      Object.values(peers).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        } else {
+          pc.addTrack(screenTrack, localStream);
+        }
+      });
+
+      isScreenSharing = true;
+      updateScreenShareButtonUI();
+      updateMediaButtonsUI();
+    } catch (err) {
+      console.error('Ekran paylaşımı başlatılamadı:', err);
+      alert('Ekran paylaşımı başlatılamadı. Tarayıcı izinlerini ve ekran paylaşımı desteğini kontrol et.');
+    }
+  }
+
+  async function stopScreenShare() {
+    if (!isScreenSharing) return;
+    isScreenSharing = false;
+
+    if (screenTrack) {
+      screenTrack.stop();
+      screenTrack = null;
+    }
+
+    localStream.getVideoTracks().forEach(t => {
+      localStream.removeTrack(t);
+    });
+
+    if (canRevertToCamera && cameraTrack) {
+      localStream.addTrack(cameraTrack);
+
+      if (!cameraPreviewStream) {
+        cameraPreviewStream = new MediaStream([cameraTrack]);
+      }
+      localVideoEl.srcObject = cameraPreviewStream;
+
+      Object.values(peers).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(cameraTrack);
+        } else {
+          pc.addTrack(cameraTrack, localStream);
+        }
+      });
+      currentCallHasVideo = true;
+    } else {
+      localVideoEl.srcObject = null;
+      Object.values(peers).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(null);
+      });
+      currentCallHasVideo = false;
+    }
+
+    updateCallStatusUI();
+    updateMediaButtonsUI();
+    updateScreenShareButtonUI();
+  }
+
+  socket.on('webrtc-offer', handleOffer);
+  socket.on('webrtc-answer', handleAnswer);
+  socket.on('webrtc-ice-candidate', handleIceCandidate);
+
+  socket.on('peer-left', ({ id }) => {
+    const pc = peers[id];
+    if (pc) {
+      pc.close();
+      delete peers[id];
+    }
+    detachRemoteStream(id);
+
+    if (Object.keys(peers).length === 0) {
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      if (cameraPreviewStream) {
+        cameraPreviewStream = null;
+      }
+      localVideoEl.srcObject = null;
+
+      micTrack    = null;
+      cameraTrack = null;
+      screenTrack = null;
+
+      manualPinnedPeerId  = null;
+      autoActiveSpeakerId = null;
+      stopVolumeMonitoring();
+      for (const rid in remoteAudioAnalysers) {
+        try {
+          remoteAudioAnalysers[rid].source.disconnect();
+        } catch (e) {}
+        delete remoteAudioAnalysers[rid];
+      }
+
+      callActive          = false;
+      currentCallHasVideo = false;
+      isScreenSharing     = false;
+      canRevertToCamera   = false;
+      updateCallStatusUI();
+      updateMediaButtonsUI();
+      updateScreenShareButtonUI();
+    }
+  });
+
+  // ---- BUTON OLAYLARI ----
+
+  voiceCallBtnEl.addEventListener('click', () => startCall(false));
+  videoCallBtnEl.addEventListener('click', () => startCall(true));
+
+  if (screenShareBtnEl) {
+    screenShareBtnEl.addEventListener('click', () => {
+      if (!callActive) {
+        alert('Ekran paylaşımı için önce aktif bir çağrı başlatmalısın.');
+        return;
+      }
+      if (!isScreenSharing) {
+        startScreenShare();
+      } else {
+        stopScreenShare();
+      }
+    });
+  }
+
+  toggleMicBtn.addEventListener('click', () => {
+    if (!micTrack) return;
+    micTrack.enabled = !micTrack.enabled;
+    updateMediaButtonsUI();
+  });
+
+  toggleCamBtn.addEventListener('click', () => {
+    if (!cameraTrack) return;
+    cameraTrack.enabled = !cameraTrack.enabled;
+    updateMediaButtonsUI();
+  });
+</script>
+</body>
+</html>
