@@ -226,6 +226,7 @@
         let isScreenSharing = false;
         let micEnabled = true;
         let camEnabled = true;
+        let hasCamera = true;
         let socket = null;
         let clientId = null;
         let mediaReady = false;
@@ -264,62 +265,98 @@
         // ═══════════════════════════════════════════════════════════════
         
         async function requestMediaPermission() {
+            console.log("[MEDYA] İzin isteniyor (ses+görüntü)...");
+            
+            const audioConstraints = {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            };
+
+            const videoConstraints = {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: "user"
+            };
+
             try {
-                console.log("[MEDYA] İzin isteniyor...");
-                
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    }, 
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: "user"
-                    }
+                // Önce ses + görüntü dene
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: audioConstraints,
+                    video: videoConstraints
                 });
-                
-                console.log("[MEDYA] İzin verildi, stream alındı");
-                
-                localVideo.srcObject = localStream;
-                mediaReady = true;
-                
-                // İzin uyarısını gizle
-                mediaPermissionWarning.classList.add("hidden");
-                
-                // Durum göstergesini güncelle
-                localStatusDot.classList.remove("bg-yellow-400");
-                localStatusDot.classList.add("bg-emerald-400");
-                
-                // Butonları güncelle
-                updateMicUI();
-                updateCamUI();
-                
-                // WebSocket bağlantısını başlat
-                connectSignaling();
-                
-                return true;
+                hasCamera = true;
             } catch (err) {
-                console.error("[MEDYA] İzin hatası:", err);
-                
-                let errorMessage = "Bilinmeyen hata";
-                
-                if (err.name === "NotAllowedError") {
-                    errorMessage = "Kamera/mikrofon izni reddedildi. Tarayıcı ayarlarından izin verin.";
-                } else if (err.name === "NotFoundError") {
-                    errorMessage = "Kamera veya mikrofon bulunamadı.";
-                } else if (err.name === "NotReadableError") {
-                    errorMessage = "Kamera veya mikrofon başka bir uygulama tarafından kullanılıyor.";
-                } else if (err.name === "OverconstrainedError") {
-                    errorMessage = "İstenen video ayarları desteklenmiyor.";
+                console.error("[MEDYA] İzin hatası (ilk deneme):", err);
+
+                // Kamera yoksa veya video kısıtları sağlanamıyorsa: sadece mikrofon iste
+                if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+                    try {
+                        console.log("[MEDYA] Kamera bulunamadı, sadece mikrofon isteniyor...");
+                        localStream = await navigator.mediaDevices.getUserMedia({
+                            audio: audioConstraints,
+                            video: false
+                        });
+                        hasCamera = false;
+                    } catch (err2) {
+                        console.error("[MEDYA] İzin hatası (sadece mikrofon):", err2);
+                        showMediaError(err2);
+                        return false;
+                    }
+                } else {
+                    showMediaError(err);
+                    return false;
                 }
-                
-                mediaError.textContent = errorMessage;
-                mediaError.classList.remove("hidden");
-                
-                return false;
             }
+
+            console.log("[MEDYA] İzin verildi, stream alındı");
+            
+            localVideo.srcObject = localStream;
+            mediaReady = true;
+
+            // İzin uyarısını gizle
+            mediaPermissionWarning.classList.add("hidden");
+            
+            // Durum göstergesini güncelle
+            localStatusDot.classList.remove("bg-yellow-400");
+            localStatusDot.classList.add("bg-emerald-400");
+            
+            // Kamera yoksa UI'ı buna göre ayarla
+            if (!hasCamera || localStream.getVideoTracks().length === 0) {
+                camEnabled = false;
+                localCamOff.classList.remove("hidden");
+                btnCam.disabled = true;
+                btnCam.classList.add("opacity-50", "cursor-not-allowed");
+                btnCam.title = "Bu cihazda kamera yok";
+            }
+
+            // Butonları güncelle
+            updateMicUI();
+            updateCamUI();
+            
+            // WebSocket bağlantısını başlat
+            connectSignaling();
+            
+            return true;
+        }
+
+        function showMediaError(err) {
+            console.error("[MEDYA] İzin hatası:", err);
+
+            let errorMessage = "Bilinmeyen hata";
+
+            if (err.name === "NotAllowedError") {
+                errorMessage = "Kamera/mikrofon izni reddedildi. Tarayıcı ayarlarından izin verin.";
+            } else if (err.name === "NotFoundError") {
+                errorMessage = "Cihazında kullanılabilir kamera veya mikrofon bulunamadı.";
+            } else if (err.name === "NotReadableError") {
+                errorMessage = "Kamera veya mikrofon başka bir uygulama tarafından kullanılıyor.";
+            } else if (err.name === "OverconstrainedError") {
+                errorMessage = "İstenen video ayarları desteklenmiyor.";
+            }
+
+            mediaError.textContent = errorMessage;
+            mediaError.classList.remove("hidden");
         }
         
         // İzin butonu tıklaması
@@ -360,7 +397,6 @@
         // ═══════════════════════════════════════════════════════════════
         
         function scrollChatToBottom() {
-            // Küçük bir gecikme ile scroll yap (DOM güncellemesi için)
             setTimeout(() => {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }, 10);
@@ -709,7 +745,7 @@
 
         // Kamera toggle
         btnCam.addEventListener("click", () => {
-            if (!localStream) return;
+            if (!localStream || btnCam.disabled) return;
             camEnabled = !camEnabled;
             localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
             updateCamUI();
@@ -735,10 +771,14 @@
                     
                     // Tüm peer'lara ekran track'ini gönder
                     peers.forEach((peerInfo, peerId) => {
-                        const sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
+                        let sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
                         if (sender) {
                             console.log(`[SCREEN] Track değiştiriliyor: ${peerId}`);
                             sender.replaceTrack(screenTrack);
+                        } else {
+                            // Eğer daha önce video sender yoksa (örn. hiç kamera yoksa), yeni track ekle
+                            console.log(`[SCREEN] Yeni video track ekleniyor: ${peerId}`);
+                            peerInfo.pc.addTrack(screenTrack, screenStream);
                         }
                     });
                     
@@ -790,7 +830,7 @@
                 screenStream = null;
             }
             
-            // Local video'yu kameraya çevir
+            // Local video'yu kameraya (veya sadece sese) çevir
             localVideo.srcObject = localStream;
             
             isScreenSharing = false;
