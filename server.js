@@ -7,7 +7,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-const url = require('url');
+// const url = require('url'); // ARTIK GEREKMİYOR
 
 const PORT = process.env.PORT || 3000;
 const MAX_ROOM_SIZE = 12;
@@ -17,10 +17,14 @@ const MAX_ROOM_SIZE = 12;
 // ═══════════════════════════════════════════════════════════════
 
 const server = http.createServer((req, res) => {
-    const parsedUrl = url.parse(req.url, true);
+    // WHATWG URL API kullanımı
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
+
+    // Güvenlik: path traversal saldırılarını önle
     pathname = pathname.replace(/\.\./g, '');
     
+    // Dosya yolunu belirle
     let filePath = '.' + pathname;
     if (filePath === './' || filePath === '.') {
         filePath = './index.html';
@@ -275,7 +279,7 @@ wss.on('connection', (ws, req) => {
         broadcastToRoom(roomCode, { type: 'status', id: clientId, action, value });
     }
 
-    function handleReaction(msg) {
+        function handleReaction(msg) {
         const { room: roomCode, emoji } = msg;
         if (!roomCode || !emoji) return;
         const allowedEmojis = ['👍', '❤️', '👏', '😂', '😮', '🎉', '🔥', '👀'];
@@ -301,9 +305,7 @@ wss.on('connection', (ws, req) => {
                 break;
             case 'kick':
                 if (targetId && targetId !== clientId) {
-                    // Kullanıcıya kick kontrol mesajı gönder
                     sendToClient(roomCode, targetId, { type: 'control', action: 'kick' });
-                    // Bağlantıyı client tarafı kapattığında 'close' eventiyle oda temizlenecek
                 }
                 break;
         }
