@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>VibeZone Oda - YavuzSOFT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <style>
+        body {
+            background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-100">
+    <!-- Oda üst bar -->
+    <header class="w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/40">
+                    <i class="fa-solid fa-headset text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="font-semibold text-lg tracking-tight">VibeZone</span>
+                        <span class="text-[11px] uppercase tracking-widest text-slate-400">Oda</span>
+                        <span id="roomCodeBadge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-200 font-mono">
+                            <i class="fa-solid fa-hashtag text-xs text-indigo-400"></i>
+                            <span id="roomCodeText">------</span>
+                        </span>
+                        <button
+                            id="copyCodeBtn"
+                            class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+                        >
+                            <i class="fa-solid fa-copy text-[10px]"></i>
+                            Kodu kopyala
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Bağlı: <span id="currentUserName" class="font-semibold text-slate-200"></span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button
+                    id="leaveBtn"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow-md shadow-rose-900/40"
+                >
+                    <i class="fa-solid fa-phone-slash text-xs"></i>
+                    Odadan Ayrıl
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ana içerik -->
+    <main class="flex-1 flex justify-center px-3 py-4">
+        <div class="max-w-6xl w-full grid lg:grid-cols-[2fr,1fr] gap-4">
+            <!-- Sol taraf: Video / ekran / kullanıcı kutuları -->
+            <section class="flex flex-col gap-3">
+                <!-- Video alanı (placeholder) -->
+                <div class="flex-1 min-h-[260px] bg-slate-900/70 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col gap-3">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                            <span class="inline-flex h-6 w-6 rounded-full bg-sky-500/15 text-sky-300 items-center justify-center text-xs">
+                                <i class="fa-solid fa-video"></i>
+                            </span>
+                            Sesli &amp; Görüntülü Alan
+                        </h2>
+                        <span class="text-[11px] text-slate-400">
+                            WebRTC ile gerçek görüntü bu alanda gösterilecek
+                        </span>
+                    </div>
+
+                    <!-- Placeholder grid -->
+                    <div class="flex-1 grid sm:grid-cols-2 gap-3">
+                        <!-- Kullanıcının kendisi -->
+                        <div class="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+                            <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[11px] flex items-center gap-1">
+                                <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>Sen</span>
+                            </div>
+                            <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[11px] flex items-center gap-1">
+                                <i class="fa-solid fa-microphone text-emerald-400"></i>
+                                <span id="selfNameTag">Kullanıcı</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center text-slate-500 text-xs px-2 text-center">
+                                <i class="fa-solid fa-user text-4xl mb-2 text-slate-700"></i>
+                                <p class="mb-1">
+                                    Kamera akışın burada görünecek.
+                                </p>
+                                <p class="text-[11px] text-slate-500">
+                                    (Henüz gerçek kamera akışı bağlı değil – WebRTC entegrasyonu gerekiyor.)
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Diğer kullanıcılar için yer -->
+                        <div class="relative rounded-xl overflow-hidden bg-slate-950 border border-dashed border-slate-700 flex items-center justify-center">
+                            <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[11px] flex items-center gap-1">
+                                <span class="h-2 w-2 rounded-full bg-slate-500"></span>
+                                <span>Boş yuva</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center text-slate-600 text-xs px-2 text-center">
+                                <i class="fa-solid fa-user-group text-4xl mb-2 text-slate-700"></i>
+                                <p>
+                                    Oda kodunu arkadaşlarınla paylaş, bağlandıklarında buradaki
+                                    kutular dolacak.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alt kontrol barı -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-2xl px-3 py-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <!-- Sol: durum -->
+                    <div class="flex items-center gap-3 text-[11px] text-slate-400">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700">
+                            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Oda aktif
+                        </span>
+                        <span class="hidden sm:inline">
+                            Ses, kamera ve ekran paylaşımını buradan yönetebilirsin.
+                        </span>
+                    </div>
+
+                    <!-- Sağ: butonlar -->
+                    <div class="flex items-center gap-2">
+                        <button
+                            id="btnMic"
+                            class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 transition-colors"
+                            title="Mikrofonu aç/kapat"
+                        >
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                        <button
+                            id="btnCam"
+                            class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 transition-colors"
+                            title="Kamerayı aç/kapat"
+                        >
+                            <i class="fa-solid fa-video"></i>
+                        </button>
+                        <button
+                            id="btnScreen"
+                            class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 transition-colors"
+                            title="Ekran paylaşımını başlat/durdur"
+                        >
+                            <i class="fa-solid fa-display"></i>
+                        </button>
+                        <button
+                            id="btnChatToggle"
+                            class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 transition-colors lg:hidden"
+                            title="Sohbet panelini aç/kapat"
+                        >
+                            <i class="fa-solid fa-comments"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sağ taraf: Yazılı sohbet -->
+            <aside
+                id="chatPanel"
+                class="flex flex-col bg-slate-950/90 border border-slate-800 rounded-2xl overflow-hidden max-h-[calc(100vh-130px)]"
+            >
+                <div class="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/20 text-violet-300">
+                            <i class="fa-solid fa-comments text-xs"></i>
+                        </span>
+                        <div>
+                            <h2 class="text-sm font-semibold">Yazılı Sohbet</h2>
+                            <p class="text-[11px] text-slate-400">
+                                Mesajların WebSocket / sunucu ile senkronize edilecek.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mesaj listesi -->
+                <div id="chatMessages" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm bg-gradient-to-b from-slate-950/60 to-slate-950">
+                    <!-- Örnek karşılama mesajı -->
+                    <div class="flex justify-center">
+                        <div class="px-3 py-1.5 rounded-full bg-slate-900 text-[11px] text-slate-400">
+                            Odaya hoş geldin! Bu yazışmalar şimdilik sadece bu tarayıcıda tutuluyor.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mesaj yazma alanı -->
+                <form id="chatForm" class="border-t border-slate-800 bg-slate-950 px-3 py-2 flex items-center gap-2 text-sm">
+                    <input
+                        id="chatInput"
+                        type="text"
+                        autocomplete="off"
+                        class="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 placeholder:text-slate-500"
+                        placeholder="Mesajını yaz ve Enter'a bas..."
+                    />
+                    <button
+                        type="submit"
+                        class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-violet-600 hover:bg-violet-500 text-white transition-colors"
+                        title="Gönder"
+                    >
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        // URL parametrelerinden oda kodu ve kullanıcı adını al
+        const params = new URLSearchParams(window.location.search);
+        let roomCode = params.get("room");
+        let userName = params.get("name") || "";
+
+        function generateGuestName() {
+            return "Misafir" + Math.floor(100 + Math.random() * 900);
+        }
+
+        // Oda kodu yoksa veya hatalıysa index'e dön
+        if (!roomCode || !/^\d{6}$/.test(roomCode)) {
+            window.location.href = "index.html";
+        }
+
+        if (!userName.trim()) {
+            userName = generateGuestName();
+        }
+
+        // Arayüze yerleştir
+        document.getElementById("roomCodeText").textContent = roomCode;
+        document.getElementById("currentUserName").textContent = userName;
+        document.getElementById("selfNameTag").textContent = userName;
+
+        // Oda kodunu kopyala
+        document.getElementById("copyCodeBtn").addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(roomCode);
+                const btn = document.getElementById("copyCodeBtn");
+                const original = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-[10px] text-emerald-400"></i> Kopyalandı';
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                }, 1500);
+            } catch (e) {
+                alert("Kopyalama başarısız. Kodu elle kopyalayabilirsin: " + roomCode);
+            }
+        });
+
+        // Odadan ayrıl -> index'e dön
+        document.getElementById("leaveBtn").addEventListener("click", () => {
+            window.location.href = "index.html";
+        });
+
+        // Basit UI toggle: Mikrofon, kamera, ekran paylaşımı (sadece ikon / renk değiştirir)
+        function toggleButtonState(btn, activeIcon, inactiveIcon) {
+            const icon = btn.querySelector("i");
+            const isActive = btn.dataset.active === "true";
+
+            if (isActive) {
+                // Kapat
+                btn.dataset.active = "false";
+                btn.classList.remove("bg-rose-600");
+                btn.classList.add("bg-slate-800");
+                icon.classList.remove(...inactiveIcon.split(" "));
+                icon.classList.add(...activeIcon.split(" "));
+            } else {
+                // Açıkken kapat görünümü
+                btn.dataset.active = "true";
+                btn.classList.remove("bg-slate-800");
+                btn.classList.add("bg-rose-600");
+                icon.classList.remove(...activeIcon.split(" "));
+                icon.classList.add(...inactiveIcon.split(" "));
+            }
+        }
+
+        const btnMic = document.getElementById("btnMic");
+        const btnCam = document.getElementById("btnCam");
+        const btnScreen = document.getElementById("btnScreen");
+
+        btnMic.dataset.active = "false";
+        btnCam.dataset.active = "false";
+        btnScreen.dataset.active = "false";
+
+        btnMic.addEventListener("click", () =>
+            toggleButtonState(btnMic, "fa-microphone", "fa-microphone-slash")
+        );
+        btnCam.addEventListener("click", () =>
+            toggleButtonState(btnCam, "fa-video", "fa-video-slash")
+        );
+        btnScreen.addEventListener("click", () =>
+            toggleButtonState(btnScreen, "fa-display", "fa-display")
+        );
+
+        // Sohbet panelini mobilde aç/kapa
+        const chatPanel = document.getElementById("chatPanel");
+        const btnChatToggle = document.getElementById("btnChatToggle");
+
+        btnChatToggle.addEventListener("click", () => {
+            chatPanel.classList.toggle("hidden");
+        });
+
+        // Basit yerel sohbet (tek tarayıcıda)
+        const chatForm = document.getElementById("chatForm");
+        const chatInput = document.getElementById("chatInput");
+        const chatMessages = document.getElementById("chatMessages");
+
+        function appendMessage(author, text, self = false) {
+            const wrapper = document.createElement("div");
+            wrapper.className = `flex ${self ? "justify-end" : "justify-start"}`;
+
+            const bubble = document.createElement("div");
+            bubble.className =
+                "max-w-[80%] px-2.5 py-1.5 rounded-xl text-[13px] leading-snug " +
+                (self
+                    ? "bg-violet-600 text-white rounded-br-none"
+                    : "bg-slate-800 text-slate-100 rounded-bl-none");
+
+            const nameEl = document.createElement("div");
+            nameEl.className = "text-[10px] text-slate-300/80 mb-0.5";
+            nameEl.textContent = author;
+
+            const textEl = document.createElement("div");
+            textEl.textContent = text;
+
+            bubble.appendChild(nameEl);
+            bubble.appendChild(textEl);
+            wrapper.appendChild(bubble);
+            chatMessages.appendChild(wrapper);
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        chatForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const text = (chatInput.value || "").trim();
+            if (!text) return;
+            appendMessage(userName, text, true);
+            chatInput.value = "";
+
+            // Burada: Mesajı WebSocket / sunucuya gönderip diğer kullanıcılara dağıtmalısın.
+        });
+    </script>
+</body>
+</html>
