@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <title>VibeZone Oda</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <style>
@@ -1110,7 +1114,7 @@
                         } else if (msg.action === "camera") {
                             // Kamera aç/kapat durumu
                             if (msg.id === clientId) {
-                                // Kendi kameramı zaten local UI'dan yönetiyoruz, istersen senkron da edilebilir
+                                // Kendi kameramızı local UI ile yönetiyoruz
                             } else {
                                 const peerInfo = peers.get(msg.id);
                                 if (peerInfo && peerInfo.tileEl) {
