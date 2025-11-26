@@ -41,7 +41,42 @@
 
         /* Konuşma göstergesi */
         .tile-speaking {
-            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9), 0 0 18px rgba(129, 140, 248, 0.7);
+            box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.9), 0 0 18px rgba(52, 211, 153, 0.6);
+        }
+
+        /* Spotlight: ekran paylaşımı yapan */
+        .tile-spotlight {
+            order: -1;
+            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9), 0 0 28px rgba(129, 140, 248, 0.75);
+        }
+        @media (min-width: 640px) {
+            .tile-spotlight {
+                grid-column: 1 / -1; /* tüm satırı kapla */
+            }
+        }
+        @media (min-width: 1024px) {
+            .tile-spotlight {
+                grid-column: 1 / -1; /* büyük ekranlarda da tüm satır */
+            }
+        }
+
+        /* Emoji tepkisi animasyonu */
+        @keyframes reaction-pop {
+            0% {
+                transform: translate(-50%, -30%) scale(0.5);
+                opacity: 0;
+            }
+            20% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -80%) scale(1);
+                opacity: 0;
+            }
+        }
+        .animate-reaction {
+            animation: reaction-pop 1.1s ease-out forwards;
         }
     </style>
 </head>
@@ -171,9 +206,25 @@
             <button id="btnScreen" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Ekran Paylaş">
                 <i class="fa-solid fa-display text-lg"></i>
             </button>
+            <button id="btnHand" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="El kaldır">
+                <i class="fa-solid fa-hand-paper text-lg"></i>
+            </button>
             <button id="btnChatToggle" class="lg:hidden h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Sohbet">
                 <i class="fa-solid fa-comments text-lg"></i>
             </button>
+
+            <!-- Emoji reaksiyonları -->
+            <div id="reactionBar" class="hidden sm:flex items-center gap-1 ml-2">
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👍">👍</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="❤️">❤️</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👏">👏</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="😂">😂</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="😮">😮</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="🎉">🎉</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="🔥">🔥</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👀">👀</button>
+            </div>
+
             <div class="w-px h-8 bg-slate-700 mx-1"></div>
             <button id="leaveBtn" class="h-12 px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-sm font-semibold flex items-center gap-2 transition-colors">
                 <i class="fa-solid fa-phone-slash"></i>
@@ -223,10 +274,12 @@
         const btnMic = document.getElementById("btnMic");
         const btnCam = document.getElementById("btnCam");
         const btnScreen = document.getElementById("btnScreen");
+        const btnHand = document.getElementById("btnHand");
         const btnChatToggle = document.getElementById("btnChatToggle");
         const leaveBtn = document.getElementById("leaveBtn");
         const copyCodeBtn = document.getElementById("copyCodeBtn");
         const btnLockRoom = document.getElementById("btnLockRoom");
+        const reactionButtons = document.querySelectorAll(".reaction-btn");
 
         // ═══════════════════════════════════════════════════════════════
         // DURUM DEĞİŞKENLERİ
@@ -248,8 +301,11 @@
         let hostId = null;
         let roomLocked = false;
 
+        let currentScreenSharerId = null;
+        let handRaised = false;
+
         const peers = new Map();        // peerId -> { pc, stream, videoEl, tileEl, name, videoSender }
-        const participants = new Map(); // clientId -> { name, isSelf, isHost }
+        const participants = new Map(); // clientId -> { name, isSelf, isHost, handRaised }
 
         const signalingServerUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 
@@ -258,7 +314,7 @@
         const speakingMonitors = new Map(); // id -> { analyser, dataArray, tileEl, speaking, lastHigh, source }
 
         // ═══════════════════════════════════════════════════════════════
-        // YARDIMCI: AudioContext ve konuşma takibi
+        // AudioContext & Konuşma Takibi
         // ═══════════════════════════════════════════════════════════════
 
         function getAudioContext() {
@@ -350,6 +406,53 @@
             try { mon.source.disconnect(); } catch {}
             try { mon.analyser.disconnect(); } catch {}
             speakingMonitors.delete(id);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Spotlight (ekran paylaşımı yapanı büyüt)
+        // ═══════════════════════════════════════════════════════════════
+
+        function updateSpotlightUI() {
+            // Herkesten spotlight'ı kaldır
+            localTile.classList.remove("tile-spotlight");
+            peers.forEach((peerInfo) => {
+                if (peerInfo.tileEl) peerInfo.tileEl.classList.remove("tile-spotlight");
+            });
+
+            if (!currentScreenSharerId) return;
+
+            if (currentScreenSharerId === clientId) {
+                localTile.classList.add("tile-spotlight");
+            } else {
+                const p = peers.get(currentScreenSharerId);
+                if (p && p.tileEl) {
+                    p.tileEl.classList.add("tile-spotlight");
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Emoji reaksiyon gösterimi
+        // ═══════════════════════════════════════════════════════════════
+
+        function showReaction(peerId, emoji) {
+            let tileEl = null;
+            if (peerId === clientId) {
+                tileEl = localTile;
+            } else {
+                const peer = peers.get(peerId);
+                tileEl = peer && peer.tileEl ? peer.tileEl : null;
+            }
+            if (!tileEl) return;
+
+            const el = document.createElement("div");
+            el.textContent = emoji;
+            el.className = "absolute animate-reaction text-3xl pointer-events-none";
+            el.style.left = "50%";
+            el.style.top = "50%";
+            el.style.transform = "translate(-50%, -50%)";
+            tileEl.appendChild(el);
+            setTimeout(() => el.remove(), 1200);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -456,7 +559,6 @@
                 btnCam.classList.add("opacity-50", "cursor-not-allowed");
                 btnCam.title = "Bu cihazda kamera yok";
 
-                // Kullanıcıya sistem mesajı
                 appendSystemMessage("Bu cihazda kamera bulunamadığı için toplantıya sadece sesli katıldın.");
             }
 
@@ -513,6 +615,9 @@
                 li.className = "flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-900/70";
 
                 const labels = [];
+                if (p.handRaised) {
+                    labels.push('<span class="text-amber-400 text-[12px]" title="El kaldırdı">✋</span>');
+                }
                 if (p.isSelf) {
                     labels.push('<span class="text-sky-400 text-[10px] flex-shrink-0">(Sen)</span>');
                 }
@@ -520,11 +625,19 @@
                     labels.push('<i class="fa-solid fa-crown text-amber-400 text-[11px]"></i>');
                 }
 
-                const controls = (isHostUser && !p.isSelf)
-                    ? `<button class="ml-auto text-slate-500 hover:text-rose-400 text-xs mute-btn" data-id="${id}" title="Mikrofonunu kapat">
-                            <i class="fa-solid fa-microphone-slash"></i>
-                       </button>`
-                    : "";
+                let controls = "";
+                if (isHostUser && !p.isSelf) {
+                    controls = `
+                        <div class="ml-auto flex items-center gap-1">
+                            <button class="text-slate-500 hover:text-rose-400 text-xs mute-btn" data-id="${id}" title="Mikrofonunu kapat">
+                                <i class="fa-solid fa-microphone-slash"></i>
+                            </button>
+                            <button class="text-slate-500 hover:text-rose-500 text-xs kick-btn" data-id="${id}" title="Kullanıcıyı odadan at">
+                                <i class="fa-solid fa-user-xmark"></i>
+                            </button>
+                        </div>
+                    `;
+                }
 
                 li.innerHTML = `
                     <span class="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
@@ -538,7 +651,13 @@
         }
 
         function addOrUpdateParticipant(id, name, isSelf = false, isHost = false) {
-            participants.set(id, { name, isSelf, isHost });
+            const existing = participants.get(id) || {};
+            participants.set(id, {
+                name: name ?? existing.name ?? "Katılımcı",
+                isSelf: isSelf || existing.isSelf || false,
+                isHost: isHost || existing.isHost || false,
+                handRaised: existing.handRaised || false
+            });
             renderParticipants();
         }
 
@@ -572,7 +691,7 @@
 
         function updateHostControlsVisibility() {
             updateLockButtonUI();
-            renderParticipants(); // host değiştiyse, mute butonları vs. güncellensin
+            renderParticipants(); // host değiştiyse, mute/kick butonları güncellensin
         }
 
         // Host: Odayı kilitle / aç
@@ -587,19 +706,36 @@
             }));
         });
 
-        // Host: Katılımcı listesinden mik kapatma
+        // Host: Katılımcı listesinden mik kapatma & atma
         participantsList.addEventListener("click", (e) => {
-            const btn = e.target.closest(".mute-btn");
-            if (!btn) return;
-            if (!isHostUser || !socket || socket.readyState !== WebSocket.OPEN) return;
-            const targetId = btn.dataset.id;
-            if (!targetId) return;
-            socket.send(JSON.stringify({
-                type: "control",
-                room: roomCode,
-                action: "mute-mic",
-                targetId
-            }));
+            const muteBtn = e.target.closest(".mute-btn");
+            if (muteBtn) {
+                if (!isHostUser || !socket || socket.readyState !== WebSocket.OPEN) return;
+                const targetId = muteBtn.dataset.id;
+                if (!targetId) return;
+                socket.send(JSON.stringify({
+                    type: "control",
+                    room: roomCode,
+                    action: "mute-mic",
+                    targetId
+                }));
+                return;
+            }
+
+            const kickBtn = e.target.closest(".kick-btn");
+            if (kickBtn) {
+                if (!isHostUser || !socket || socket.readyState !== WebSocket.OPEN) return;
+                const targetId = kickBtn.dataset.id;
+                if (!targetId) return;
+                if (!confirm("Bu katılımcıyı odadan atmak istiyor musun?")) return;
+                socket.send(JSON.stringify({
+                    type: "control",
+                    room: roomCode,
+                    action: "kick",
+                    targetId
+                }));
+                return;
+            }
         });
 
         // ═══════════════════════════════════════════════════════════════
@@ -652,6 +788,15 @@
             socket.send(JSON.stringify({ type: "chat", room: roomCode, text }));
             chatInput.value = "";
         });
+
+        // ═══════════════════════════════════════════════════════════════
+        // STATUS & REACTION YARDIMCI
+        // ═══════════════════════════════════════════════════════════════
+
+        function sendStatus(action, value) {
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+            socket.send(JSON.stringify({ type: "status", room: roomCode, action, value }));
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // VIDEO TILE
@@ -898,6 +1043,10 @@
                         appendSystemMessage(`${msg.name || "Biri"} ayrıldı`);
                         removePeer(msg.id);
                         removeParticipant(msg.id);
+                        if (currentScreenSharerId === msg.id) {
+                            currentScreenSharerId = null;
+                            updateSpotlightUI();
+                        }
                         break;
                         
                     case "chat":
@@ -934,7 +1083,46 @@
                             micEnabled = false;
                             updateMicUI();
                             appendSystemMessage("Toplantı sahibi mikrofonunu kapattı.");
+                        } else if (msg.action === "kick") {
+                            alert("Toplantı sahibi seni odadan çıkardı.");
+                            cleanup();
+                            window.location.href = "index.html";
                         }
+                        break;
+
+                    case "status":
+                        if (msg.action === "hand") {
+                            const p = participants.get(msg.id);
+                            if (p) {
+                                p.handRaised = !!msg.value;
+                                participants.set(msg.id, p);
+                                renderParticipants();
+                                if (msg.id !== clientId && msg.value) {
+                                    appendSystemMessage(`${p.name} el kaldırdı.`);
+                                }
+                            }
+                        } else if (msg.action === "screen-share") {
+                            const p = participants.get(msg.id);
+                            if (msg.value) {
+                                currentScreenSharerId = msg.id;
+                                updateSpotlightUI();
+                                if (msg.id !== clientId) {
+                                    appendSystemMessage(`${(p && p.name) || "Biri"} ekran paylaşımı başlattı.`);
+                                }
+                            } else {
+                                if (currentScreenSharerId === msg.id) {
+                                    currentScreenSharerId = null;
+                                    updateSpotlightUI();
+                                }
+                                if (msg.id !== clientId) {
+                                    appendSystemMessage(`${(p && p.name) || "Biri"} ekran paylaşımını durdurdu.`);
+                                }
+                            }
+                        }
+                        break;
+
+                    case "reaction":
+                        showReaction(msg.id, msg.emoji);
                         break;
                         
                     case "full":
@@ -1013,6 +1201,19 @@
             }
         }
 
+        function updateHandUI() {
+            const icon = btnHand.querySelector("i");
+            if (handRaised) {
+                btnHand.classList.remove("bg-slate-800");
+                btnHand.classList.add("bg-amber-600");
+                icon.classList.add("text-white");
+            } else {
+                btnHand.classList.add("bg-slate-800");
+                btnHand.classList.remove("bg-amber-600");
+                icon.classList.remove("text-white");
+            }
+        }
+
         // Mikrofon toggle
         btnMic.addEventListener("click", () => {
             if (!localStream) return;
@@ -1029,11 +1230,43 @@
             updateCamUI();
         });
 
+        // El kaldır
+        btnHand.addEventListener("click", () => {
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+            handRaised = !handRaised;
+            sendStatus("hand", handRaised);
+            updateHandUI();
+            // Kendimizin listede işaretlenmesi
+            const self = participants.get(clientId);
+            if (self) {
+                self.handRaised = handRaised;
+                participants.set(clientId, self);
+                renderParticipants();
+            }
+        });
+
+        // Emoji butonları
+        reactionButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (!socket || socket.readyState !== WebSocket.OPEN) return;
+                const emoji = btn.dataset.emoji;
+                if (!emoji) return;
+                socket.send(JSON.stringify({ type: "reaction", room: roomCode, emoji }));
+                showReaction(clientId, emoji);
+            });
+        });
+
         // Ekran paylaşımı
         btnScreen.addEventListener("click", async () => {
             if (!localStream) return;
             
             if (!isScreenSharing) {
+                // Aynı anda sadece bir kişi ekran paylaşsın
+                if (currentScreenSharerId && currentScreenSharerId !== clientId) {
+                    alert("Şu anda zaten birisi ekran paylaşıyor.");
+                    return;
+                }
+
                 try {
                     console.log("[SCREEN] Ekran paylaşımı başlatılıyor...");
                     
@@ -1060,7 +1293,10 @@
                     localVideo.srcObject = screenStream;
                     
                     isScreenSharing = true;
+                    currentScreenSharerId = clientId;
                     updateScreenUI(true);
+                    updateSpotlightUI();
+                    sendStatus("screen-share", true);
                     appendSystemMessage("Ekran paylaşımı başladı");
                     
                     // Paylaşım bittiğinde
@@ -1106,7 +1342,12 @@
             localVideo.srcObject = localStream;
             
             isScreenSharing = false;
+            if (currentScreenSharerId === clientId) {
+                currentScreenSharerId = null;
+                sendStatus("screen-share", false);
+            }
             updateScreenUI(false);
+            updateSpotlightUI();
             appendSystemMessage("Ekran paylaşımı durduruldu");
         }
 
