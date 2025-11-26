@@ -7,7 +7,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-const url = require('url'); // <-- EKLENDİ
+const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const MAX_ROOM_SIZE = 12;
@@ -17,26 +17,19 @@ const MAX_ROOM_SIZE = 12;
 // ═══════════════════════════════════════════════════════════════
 
 const server = http.createServer((req, res) => {
-    // URL'yi parse et (query string'i ayır)
     const parsedUrl = url.parse(req.url, true);
     let pathname = parsedUrl.pathname;
-    
-    // Güvenlik: path traversal saldırılarını önle
     pathname = pathname.replace(/\.\./g, '');
     
-    // Dosya yolunu belirle
     let filePath = '.' + pathname;
     if (filePath === './' || filePath === '.') {
         filePath = './index.html';
     }
     
-    // Debug: Hangi dosya isteniyor?
     console.log(`[HTTP] İstek: ${req.url} → Dosya: ${filePath}`);
     
-    // Dosya uzantısını al
     const extname = path.extname(filePath).toLowerCase();
     
-    // MIME types
     const mimeTypes = {
         '.html': 'text/html; charset=utf-8',
         '.js': 'text/javascript; charset=utf-8',
@@ -59,12 +52,10 @@ const server = http.createServer((req, res) => {
 
     const contentType = mimeTypes[extname] || 'application/octet-stream';
 
-    // Dosya var mı kontrol et
     fs.access(filePath, fs.constants.F_OK, (err) => {
         if (err) {
             console.log(`[HTTP] 404 - Dosya bulunamadı: ${filePath}`);
             
-            // Mevcut dosyaları listele (debug için)
             fs.readdir('.', (err, files) => {
                 if (!err) {
                     console.log(`[HTTP] Mevcut dosyalar: ${files.join(', ')}`);
@@ -86,7 +77,6 @@ const server = http.createServer((req, res) => {
             return;
         }
 
-        // Dosyayı oku ve gönder
         fs.readFile(filePath, (error, content) => {
             if (error) {
                 console.error(`[HTTP] Dosya okuma hatası: ${error.message}`);
@@ -309,6 +299,13 @@ wss.on('connection', (ws, req) => {
                     sendToClient(roomCode, targetId, { type: 'control', action: 'mute-mic' });
                 }
                 break;
+            case 'kick':
+                if (targetId && targetId !== clientId) {
+                    // Kullanıcıya kick kontrol mesajı gönder
+                    sendToClient(roomCode, targetId, { type: 'control', action: 'kick' });
+                    // Bağlantıyı client tarafı kapattığında 'close' eventiyle oda temizlenecek
+                }
+                break;
         }
     }
 
@@ -318,9 +315,12 @@ wss.on('connection', (ws, req) => {
         if (!room) return;
 
         const wasHost = clientId === room.hostId;
+        const client = room.clients.get(clientId);
+        const name = client ? client.name : clientName;
+
         room.clients.delete(clientId);
-        broadcastToRoom(currentRoom, { type: 'peer-left', id: clientId, name: clientName });
-        console.log(`[-] ${clientName} ← #${currentRoom}`);
+        broadcastToRoom(currentRoom, { type: 'peer-left', id: clientId, name });
+        console.log(`[-] ${name} ← #${currentRoom}`);
 
         if (room.clients.size === 0) {
             rooms.delete(currentRoom);
@@ -365,7 +365,6 @@ server.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════════════════╝
     `);
     
-    // Başlangıçta mevcut dosyaları listele
     fs.readdir('.', (err, files) => {
         if (err) {
             console.error('[HATA] Dosyalar okunamadı:', err.message);
@@ -378,7 +377,6 @@ server.listen(PORT, () => {
                 console.log(`  ${icon} ${file}`);
             });
             
-            // Gerekli dosyaları kontrol et
             const required = ['index.html', 'room.html'];
             const missing = required.filter(f => !files.includes(f));
             
