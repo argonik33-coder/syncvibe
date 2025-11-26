@@ -81,12 +81,24 @@
         .animate-reaction {
             animation: reaction-pop 1.1s ease-out forwards;
         }
+
+        /* Mobilde sidePanel'i tam ekran drawer gibi göster */
+        @media (max-width: 1023px) {
+            #sidePanel.mobile-open {
+                position: fixed;
+                inset: 0;
+                width: 100%;
+                max-width: 100%;
+                z-index: 40;
+                background-color: rgba(15, 23, 42, 0.98); /* neredeyse tam koyu arka plan */
+            }
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col text-slate-100 overflow-hidden">
     <!-- Header -->
     <header class="flex-shrink-0 w-full bg-slate-950/95 border-b border-slate-800">
-        <div class="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
+        <div class="max-w-6xl mx-auto px-3 py-1.5 sm:px-4 sm:py-2.5 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
                     <i class="fa-solid fa-headset text-lg"></i>
@@ -123,7 +135,7 @@
     <main class="flex-1 flex overflow-hidden">
         <!-- Video Grid -->
         <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden">
-            <div id="videoGrid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto">
+            <div id="videoGrid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-4 overflow-y-auto">
                 <!-- Local Video -->
                 <div id="localTile" class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
                     <!-- muted: ekran sesi kendi kulağına dönmesin -->
@@ -167,7 +179,13 @@
             <!-- Katılımcılar -->
             <div class="flex-shrink-0 border-b border-slate-800">
                 <div class="px-4 py-3 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold">Katılımcılar (<span id="participantCount">1</span>)</h2>
+                    <h2 class="text-sm font-semibold">
+                        Katılımcılar (<span id="participantCount">1</span>)
+                    </h2>
+                    <!-- Mobilde kapat butonu -->
+                    <button id="btnSideClose" class="lg:hidden text-slate-400 hover:text-slate-200 text-xs">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
                 <ul id="participantsList" class="px-3 pb-3 space-y-1 text-xs max-h-32 overflow-y-auto"></ul>
             </div>
@@ -200,21 +218,21 @@
 
     <!-- Bottom Controls -->
     <footer class="flex-shrink-0 border-t border-slate-800 bg-slate-950/95">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-center gap-2 sm:gap-3">
-            <button id="btnMic" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Mikrofon">
+        <div class="max-w-5xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-3">
+            <button id="btnMic" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Mikrofon">
                 <i class="fa-solid fa-microphone text-lg"></i>
             </button>
-            <button id="btnCam" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Kamera">
+            <button id="btnCam" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Kamera">
                 <i class="fa-solid fa-video text-lg"></i>
             </button>
-            <button id="btnScreen" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Ekran Paylaş">
+            <button id="btnScreen" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Ekran Paylaş">
                 <i class="fa-solid fa-display text-lg"></i>
             </button>
 
-            <button id="btnHand" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="El kaldır">
+            <button id="btnHand" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="El kaldır">
                 <i class="fa-solid fa-hand-paper text-lg"></i>
             </button>
-            <button id="btnChatToggle" class="lg:hidden h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Sohbet">
+            <button id="btnChatToggle" class="lg:hidden h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Sohbet">
                 <i class="fa-solid fa-comments text-lg"></i>
             </button>
 
@@ -231,7 +249,7 @@
             </div>
 
             <div class="w-px h-8 bg-slate-700 mx-1"></div>
-            <button id="leaveBtn" class="h-12 px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-sm font-semibold flex items-center gap-2 transition-colors">
+            <button id="leaveBtn" class="h-11 sm:h-12 px-4 sm:px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors">
                 <i class="fa-solid fa-phone-slash"></i>
                 <span class="hidden sm:inline">Ayrıl</span>
             </button>
@@ -277,6 +295,7 @@
         const copyCodeBtn = document.getElementById("copyCodeBtn");
         const btnLockRoom = document.getElementById("btnLockRoom");
         const reactionButtons = document.querySelectorAll(".reaction-btn");
+        const btnSideClose = document.getElementById("btnSideClose");
 
         // DURUM
         const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -1264,7 +1283,7 @@
                             ? "Ekran + sekme/pencere sesi paylaşılıyor (tarayıcı seçimindeki sese göre)."
                             : "Ekran paylaşımı başladı (tarayıcıdaki seçeneklere göre ses olmayabilir)."
                     );
-
+                    
                     screenVideoTrack.onended = () => {
                         console.log("[SCREEN] Ekran paylaşımı kullanıcı tarafından durduruldu");
                         stopScreenShare();
@@ -1320,11 +1339,29 @@
             appendSystemMessage("Ekran paylaşımı durduruldu");
         }
 
-        // Sohbet paneli toggle (mobil)
+        // Sohbet / Katılımcılar paneli toggle (mobil)
+        function openMobileSidePanel() {
+            sidePanel.classList.remove("hidden");
+            sidePanel.classList.add("flex", "mobile-open");
+        }
+
+        function closeMobileSidePanel() {
+            sidePanel.classList.remove("flex", "mobile-open");
+            sidePanel.classList.add("hidden");
+        }
+
         btnChatToggle.addEventListener("click", () => {
-            sidePanel.classList.toggle("hidden");
-            sidePanel.classList.toggle("flex");
+            const isOpen = sidePanel.classList.contains("mobile-open");
+            if (isOpen) {
+                closeMobileSidePanel();
+            } else {
+                openMobileSidePanel();
+            }
         });
+
+        if (btnSideClose) {
+            btnSideClose.addEventListener("click", closeMobileSidePanel);
+        }
 
         // Oda kodu kopyala
         copyCodeBtn.addEventListener("click", async () => {
