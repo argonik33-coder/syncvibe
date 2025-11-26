@@ -49,14 +49,17 @@
             order: -1;
             box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9), 0 0 28px rgba(129, 140, 248, 0.75);
         }
+        /* Daha küçük spotlight */
         @media (min-width: 640px) {
+            /* sm: 2 kolon → spotlight 2 kolon (full) */
             .tile-spotlight {
-                grid-column: 1 / -1;
+                grid-column: 1 / span 2;
             }
         }
         @media (min-width: 1024px) {
+            /* lg: 3 kolon → spotlight 2 kolon */
             .tile-spotlight {
-                grid-column: 1 / -1;
+                grid-column: 1 / span 2;
             }
         }
 
