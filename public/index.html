@@ -33,13 +33,15 @@
                         <span class="font-semibold text-lg tracking-tight">VibeZone</span>
                         <span class="text-xs uppercase tracking-widest text-slate-400">by YavuzSOFT</span>
                     </div>
-                    <p class="text-xs text-slate-400">Sesli · Yazılı · Görüntülü · Ekran Paylaşımı</p>
+                    <p class="text-xs text-slate-400">
+                        Sesli · Yazılı · Görüntülü · Ekran Paylaşımlı Konferans
+                    </p>
                 </div>
             </div>
             <div class="hidden sm:flex items-center gap-3 text-xs text-slate-400">
                 <span class="inline-flex items-center gap-1">
                     <i class="fa-solid fa-shield-halved text-emerald-400"></i>
-                    Uçtan uca odalar
+                    WebRTC tabanlı görüşme
                 </span>
                 <span class="inline-flex items-center gap-1">
                     <i class="fa-solid fa-globe"></i>
@@ -58,22 +60,22 @@
                     Arkadaşlarınla <span class="text-indigo-400">VibeZone</span>'da buluş.
                 </h1>
                 <p class="text-sm sm:text-base text-slate-300 mb-6">
-                    Tek tıkla sesli, yazılı, görüntülü ve ekran paylaşımlı odalar oluştur.
-                    6 haneli oda kodunu arkadaşlarınla paylaş, anında bağlanın.
+                    Tek tıkla çok katılımcılı sesli, yazılı, görüntülü ve ekran paylaşımlı
+                    odalar oluştur. 6 haneli oda kodunu arkadaşlarınla paylaş, anında bağlanın.
                 </p>
 
                 <ul class="space-y-2 text-sm text-slate-300 mb-8">
                     <li class="flex items-center gap-2">
                         <i class="fa-solid fa-microphone-lines text-emerald-400 w-5"></i>
-                        Yüksek kaliteli sesli sohbet.
+                        WebRTC ile çok katılımcılı sesli/görüntülü sohbet.
                     </li>
                     <li class="flex items-center gap-2">
                         <i class="fa-solid fa-video text-sky-400 w-5"></i>
                         Kamera ve ekran paylaşımı desteği.
                     </li>
                     <li class="flex items-center gap-2">
-                        <i class="fa-solid fa-comments text-violet-400 w-5"></i>
-                        Gerçek zamanlı yazılı sohbet.
+                        <i class="fa-solid fa-users-rectangle text-violet-400 w-5"></i>
+                        Katılımcı listesi ve konuşan kişi vurgusu.
                     </li>
                     <li class="flex items-center gap-2">
                         <i class="fa-solid fa-keyboard text-amber-400 w-5"></i>
@@ -82,8 +84,9 @@
                 </ul>
 
                 <p class="text-xs text-slate-500">
-                    Not: Bu demo arayüzdür. Gerçek zamanlı iletişim için WebRTC ve sinyal sunucusu
-                    entegrasyonu gereklidir.
+                    Not: WebRTC için bu proje ile birlikte gelen
+                    <span class="font-semibold">server.js</span> dosyasını Node.js ile
+                    çalıştırman gerekiyor.
                 </p>
             </section>
 
@@ -186,24 +189,20 @@
     </footer>
 
     <script>
-        // 6 haneli sayısal oda kodu üret
         function generateRoomCode() {
             return Math.floor(100000 + Math.random() * 900000).toString();
         }
 
-        // Misafir ismi üret: Misafir123
         function generateGuestName() {
             return "Misafir" + Math.floor(100 + Math.random() * 900);
         }
 
-        // Ortak: kullanıcı adı al / üret
         function resolveUsername() {
             const input = document.getElementById("username");
             const value = (input.value || "").trim();
             return value || generateGuestName();
         }
 
-        // Odaya yönlendirme
         function goToRoom(mode) {
             const username = resolveUsername();
             let roomCode;
@@ -233,7 +232,6 @@
         document.getElementById("createRoomBtn").addEventListener("click", () => goToRoom("create"));
         document.getElementById("joinRoomBtn").addEventListener("click", () => goToRoom("join"));
 
-        // Enter ile katılma
         document.getElementById("roomCodeInput").addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 goToRoom("join");
