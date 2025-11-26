@@ -38,6 +38,11 @@
             max-height: calc(100vh - 200px);
             overflow-y: auto;
         }
+
+        /* Konuşma göstergesi */
+        .tile-speaking {
+            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9), 0 0 18px rgba(129, 140, 248, 0.7);
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col text-slate-100 overflow-hidden">
@@ -61,11 +66,17 @@
                     <p class="text-xs text-slate-400">Sen: <span id="currentUserName" class="text-slate-200"></span></p>
                 </div>
             </div>
-            <div id="connectionStatus" class="flex items-center gap-2 text-xs">
-                <span class="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-900/50 border border-yellow-700 text-yellow-400">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Bağlanıyor...</span>
-                </span>
+            <div class="flex items-center gap-2 text-xs">
+                <div id="connectionStatus" class="flex items-center gap-2">
+                    <span class="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-900/50 border border-yellow-700 text-yellow-400">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>Bağlanıyor...</span>
+                    </span>
+                </div>
+                <button id="btnLockRoom" class="hidden px-2 py-1 rounded-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] flex items-center gap-1">
+                    <i class="fa-solid fa-lock-open"></i>
+                    <span class="hidden sm:inline">Odayı kilitle</span>
+                </button>
             </div>
         </div>
     </header>
@@ -100,9 +111,9 @@
             <div id="mediaPermissionWarning" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-50">
                 <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md text-center">
                     <i class="fa-solid fa-video text-5xl text-indigo-400 mb-4"></i>
-                    <h2 class="text-xl font-semibold mb-2">Kamera ve Mikrofon İzni Gerekli</h2>
+                    <h2 class="text-xl font-semibold mb-2">Mikrofon (ve varsa kamera) izni gerekli</h2>
                     <p class="text-sm text-slate-400 mb-4">
-                        Toplantıya katılmak için tarayıcınızın kamera ve mikrofon erişimine izin vermeniz gerekiyor.
+                        Toplantıya katılmak için mikrofona (ve bağlıysa kameraya) tarayıcı üzerinden izin vermen gerekiyor.
                     </p>
                     <button id="requestMediaBtn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium">
                         <i class="fa-solid fa-unlock mr-2"></i>İzin Ver
@@ -196,6 +207,7 @@
         const localCamOff = document.getElementById("localCamOff");
         const localStatusDot = document.getElementById("localStatusDot");
         const localMicIcon = document.getElementById("localMicIcon");
+        const localTile = document.getElementById("localTile");
         const videoGrid = document.getElementById("videoGrid");
         const sidePanel = document.getElementById("sidePanel");
         const participantsList = document.getElementById("participantsList");
@@ -214,6 +226,7 @@
         const btnChatToggle = document.getElementById("btnChatToggle");
         const leaveBtn = document.getElementById("leaveBtn");
         const copyCodeBtn = document.getElementById("copyCodeBtn");
+        const btnLockRoom = document.getElementById("btnLockRoom");
 
         // ═══════════════════════════════════════════════════════════════
         // DURUM DEĞİŞKENLERİ
@@ -231,10 +244,113 @@
         let clientId = null;
         let mediaReady = false;
 
-        const peers = new Map();
-        const participants = new Map();
+        let isHostUser = false;
+        let hostId = null;
+        let roomLocked = false;
+
+        const peers = new Map();        // peerId -> { pc, stream, videoEl, tileEl, name, videoSender }
+        const participants = new Map(); // clientId -> { name, isSelf, isHost }
 
         const signalingServerUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+
+        // Konuşma göstergesi için
+        let audioContext = null;
+        const speakingMonitors = new Map(); // id -> { analyser, dataArray, tileEl, speaking, lastHigh, source }
+
+        // ═══════════════════════════════════════════════════════════════
+        // YARDIMCI: AudioContext ve konuşma takibi
+        // ═══════════════════════════════════════════════════════════════
+
+        function getAudioContext() {
+            if (audioContext) return audioContext;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) {
+                console.warn("AudioContext desteklenmiyor.");
+                return null;
+            }
+            audioContext = new AC();
+            return audioContext;
+        }
+
+        function monitorStreamAudio(id, stream, tileEl) {
+            const ac = getAudioContext();
+            if (!ac || !stream) return;
+            if (speakingMonitors.has(id)) return;
+
+            const audioTracks = stream.getAudioTracks();
+            if (!audioTracks.length) return;
+
+            const mediaStream = new MediaStream([audioTracks[0]]);
+            let source;
+            try {
+                source = ac.createMediaStreamSource(mediaStream);
+            } catch (e) {
+                console.warn("Konuşma göstergesi için kaynak oluşturulamadı:", e);
+                return;
+            }
+
+            const analyser = ac.createAnalyser();
+            analyser.fftSize = 1024;
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.fftSize);
+
+            speakingMonitors.set(id, {
+                analyser,
+                dataArray,
+                tileEl,
+                speaking: false,
+                lastHigh: 0,
+                source
+            });
+        }
+
+        function startSpeakingDetectionLoop() {
+            const ac = getAudioContext();
+            if (!ac) return;
+            if (startSpeakingDetectionLoop.started) return;
+            startSpeakingDetectionLoop.started = true;
+
+            const THRESHOLD = 0.02;
+            const HOLD_MS = 300;
+
+            function loop() {
+                const now = performance.now();
+                speakingMonitors.forEach((m) => {
+                    m.analyser.getByteTimeDomainData(m.dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < m.dataArray.length; i++) {
+                        const v = (m.dataArray[i] - 128) / 128;
+                        sum += v * v;
+                    }
+                    const rms = Math.sqrt(sum / m.dataArray.length);
+
+                    if (rms > THRESHOLD) {
+                        m.lastHigh = now;
+                    }
+
+                    const isSpeaking = (now - m.lastHigh) < HOLD_MS;
+
+                    if (isSpeaking !== m.speaking) {
+                        m.speaking = isSpeaking;
+                        if (m.tileEl) {
+                            m.tileEl.classList.toggle("tile-speaking", isSpeaking);
+                        }
+                    }
+                });
+
+                requestAnimationFrame(loop);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function stopSpeakingMonitor(id) {
+            const mon = speakingMonitors.get(id);
+            if (!mon) return;
+            try { mon.source.disconnect(); } catch {}
+            try { mon.analyser.disconnect(); } catch {}
+            speakingMonitors.delete(id);
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // BAĞLANTI DURUMU
@@ -265,6 +381,13 @@
         // ═══════════════════════════════════════════════════════════════
         
         async function requestMediaPermission() {
+            // Eğer zaten izin aldıysak tekrar deneme
+            if (mediaReady && localStream) {
+                console.log("[MEDYA] Zaten medya izni verilmiş.");
+                mediaPermissionWarning.classList.add("hidden");
+                return true;
+            }
+
             console.log("[MEDYA] İzin isteniyor (ses+görüntü)...");
             
             const audioConstraints = {
@@ -314,6 +437,10 @@
             localVideo.srcObject = localStream;
             mediaReady = true;
 
+            // Konuşma göstergesi (local)
+            monitorStreamAudio("local", localStream, localTile);
+            startSpeakingDetectionLoop();
+
             // İzin uyarısını gizle
             mediaPermissionWarning.classList.add("hidden");
             
@@ -328,6 +455,9 @@
                 btnCam.disabled = true;
                 btnCam.classList.add("opacity-50", "cursor-not-allowed");
                 btnCam.title = "Bu cihazda kamera yok";
+
+                // Kullanıcıya sistem mesajı
+                appendSystemMessage("Bu cihazda kamera bulunamadığı için toplantıya sadece sesli katıldın.");
             }
 
             // Butonları güncelle
@@ -346,51 +476,131 @@
             let errorMessage = "Bilinmeyen hata";
 
             if (err.name === "NotAllowedError") {
-                errorMessage = "Kamera/mikrofon izni reddedildi. Tarayıcı ayarlarından izin verin.";
+                errorMessage = "Kamera/mikrofon izni reddedildi. Tarayıcı adres çubuğundaki kilit simgesine tıklayıp izinleri tekrar açman gerekiyor.";
             } else if (err.name === "NotFoundError") {
                 errorMessage = "Cihazında kullanılabilir kamera veya mikrofon bulunamadı.";
             } else if (err.name === "NotReadableError") {
                 errorMessage = "Kamera veya mikrofon başka bir uygulama tarafından kullanılıyor.";
             } else if (err.name === "OverconstrainedError") {
-                errorMessage = "İstenen video ayarları desteklenmiyor.";
+                errorMessage = "İstenen video ayarları bu cihaz tarafından desteklenmiyor.";
             }
 
             mediaError.textContent = errorMessage;
             mediaError.classList.remove("hidden");
         }
         
-        // İzin butonu tıklaması
-        requestMediaBtn.addEventListener("click", requestMediaPermission);
+        // İzin butonu tıklaması (user gesture)
+        requestMediaBtn.addEventListener("click", async () => {
+            const ac = getAudioContext();
+            if (ac && ac.state === "suspended") {
+                try { await ac.resume(); } catch {}
+            }
+            await requestMediaPermission();
+        });
 
         // ═══════════════════════════════════════════════════════════════
-        // KATILIMCI LİSTESİ
+        // KATILIMCI LİSTESİ + HOST YETKİLERİ
         // ═══════════════════════════════════════════════════════════════
         
         function updateParticipantCount() {
             participantCountEl.textContent = participants.size;
         }
 
-        function addParticipant(id, name, isSelf = false) {
-            if (participants.has(id)) return;
-            
-            const li = document.createElement("li");
-            li.className = "flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-900/70";
-            li.innerHTML = `
-                <span class="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                <span class="truncate">${name}</span>
-                ${isSelf ? '<span class="text-sky-400 text-[10px] flex-shrink-0">(Sen)</span>' : ''}
-            `;
-            participantsList.appendChild(li);
-            participants.set(id, { name, el: li, isSelf });
+        function renderParticipants() {
+            participantsList.innerHTML = "";
+            participants.forEach((p, id) => {
+                const li = document.createElement("li");
+                li.className = "flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-900/70";
+
+                const labels = [];
+                if (p.isSelf) {
+                    labels.push('<span class="text-sky-400 text-[10px] flex-shrink-0">(Sen)</span>');
+                }
+                if (p.isHost) {
+                    labels.push('<i class="fa-solid fa-crown text-amber-400 text-[11px]"></i>');
+                }
+
+                const controls = (isHostUser && !p.isSelf)
+                    ? `<button class="ml-auto text-slate-500 hover:text-rose-400 text-xs mute-btn" data-id="${id}" title="Mikrofonunu kapat">
+                            <i class="fa-solid fa-microphone-slash"></i>
+                       </button>`
+                    : "";
+
+                li.innerHTML = `
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                    <span class="truncate">${p.name}</span>
+                    ${labels.join("&nbsp;")}
+                    ${controls}
+                `;
+                participantsList.appendChild(li);
+            });
             updateParticipantCount();
         }
 
-        function removeParticipant(id) {
-            const info = participants.get(id);
-            if (info && info.el) info.el.remove();
-            participants.delete(id);
-            updateParticipantCount();
+        function addOrUpdateParticipant(id, name, isSelf = false, isHost = false) {
+            participants.set(id, { name, isSelf, isHost });
+            renderParticipants();
         }
+
+        function removeParticipant(id) {
+            participants.delete(id);
+            renderParticipants();
+        }
+
+        // Host kilit butonu görünürlüğü
+        function updateLockButtonUI() {
+            if (!btnLockRoom) return;
+            if (!isHostUser) {
+                btnLockRoom.classList.add("hidden");
+                return;
+            }
+            btnLockRoom.classList.remove("hidden");
+            const icon = btnLockRoom.querySelector("i");
+            const span = btnLockRoom.querySelector("span");
+            if (roomLocked) {
+                icon.className = "fa-solid fa-lock";
+                if (span) span.textContent = "Oda kilitli";
+                btnLockRoom.classList.add("bg-amber-900/60", "border-amber-600", "text-amber-300");
+                btnLockRoom.classList.remove("bg-slate-900", "border-slate-700");
+            } else {
+                icon.className = "fa-solid fa-lock-open";
+                if (span) span.textContent = "Odayı kilitle";
+                btnLockRoom.classList.add("bg-slate-900", "border-slate-700");
+                btnLockRoom.classList.remove("bg-amber-900/60", "border-amber-600", "text-amber-300");
+            }
+        }
+
+        function updateHostControlsVisibility() {
+            updateLockButtonUI();
+            renderParticipants(); // host değiştiyse, mute butonları vs. güncellensin
+        }
+
+        // Host: Odayı kilitle / aç
+        btnLockRoom.addEventListener("click", () => {
+            if (!isHostUser || !socket || socket.readyState !== WebSocket.OPEN) return;
+            const newState = !roomLocked;
+            socket.send(JSON.stringify({
+                type: "control",
+                room: roomCode,
+                action: "lock-room",
+                value: newState
+            }));
+        });
+
+        // Host: Katılımcı listesinden mik kapatma
+        participantsList.addEventListener("click", (e) => {
+            const btn = e.target.closest(".mute-btn");
+            if (!btn) return;
+            if (!isHostUser || !socket || socket.readyState !== WebSocket.OPEN) return;
+            const targetId = btn.dataset.id;
+            if (!targetId) return;
+            socket.send(JSON.stringify({
+                type: "control",
+                room: roomCode,
+                action: "mute-mic",
+                targetId
+            }));
+        });
 
         // ═══════════════════════════════════════════════════════════════
         // SOHBET
@@ -489,14 +699,36 @@
             
             const pc = new RTCPeerConnection(iceConfig);
             
-            // Local stream track'lerini ekle
-            localStream.getTracks().forEach(track => {
-                console.log(`[PEER] Track ekleniyor: ${track.kind}`);
+            // Local stream track'lerini ekle: SES
+            localStream.getAudioTracks().forEach(track => {
+                console.log(`[PEER] Audio track ekleniyor`);
                 pc.addTrack(track, localStream);
             });
+
+            // Video için: kamera varsa kamera track, yoksa (veya ekran paylaşılıyorsa) transceiver
+            let initialVideoTrack = null;
+            let initialStreamForVideo = null;
+
+            if (isScreenSharing && screenStream) {
+                initialVideoTrack = screenStream.getVideoTracks()[0] || null;
+                initialStreamForVideo = screenStream;
+            } else {
+                initialVideoTrack = localStream.getVideoTracks()[0] || null;
+                initialStreamForVideo = localStream;
+            }
+
+            let videoSender = null;
+            if (initialVideoTrack) {
+                console.log("[PEER] Video track ekleniyor (kamera veya ekran)...");
+                videoSender = pc.addTrack(initialVideoTrack, initialStreamForVideo);
+            } else {
+                console.log("[PEER] Video track yok, transceiver oluşturuluyor (ileride ekran paylaşımı için)...");
+                const transceiver = pc.addTransceiver("video");
+                videoSender = transceiver.sender;
+            }
             
             const { videoEl, tileEl } = createRemoteTile(peerId, peerName);
-            const peerInfo = { pc, stream: null, videoEl, tileEl, name: peerName };
+            const peerInfo = { pc, stream: null, videoEl, tileEl, name: peerName, videoSender };
             peers.set(peerId, peerInfo);
             
             // Remote track geldiğinde
@@ -505,6 +737,12 @@
                 const [remoteStream] = event.streams;
                 peerInfo.stream = remoteStream;
                 videoEl.srcObject = remoteStream;
+
+                if (event.track.kind === "audio") {
+                    // Konuşma göstergesi (remote)
+                    monitorStreamAudio(peerId, remoteStream, tileEl);
+                    startSpeakingDetectionLoop();
+                }
             };
             
             // ICE candidate
@@ -549,6 +787,8 @@
             if (peerInfo.tileEl) {
                 peerInfo.tileEl.remove();
             }
+
+            stopSpeakingMonitor(peerId);
             
             peers.delete(peerId);
         }
@@ -626,20 +866,25 @@
                 switch (msg.type) {
                     case "joined":
                         clientId = msg.id;
-                        addParticipant(clientId, userName, true);
+                        hostId = msg.hostId;
+                        isHostUser = msg.isHost;
+                        roomLocked = msg.locked;
+
+                        addOrUpdateParticipant(clientId, userName, true, isHostUser);
                         appendSystemMessage("Toplantıya bağlandın!");
                         updateConnectionStatus("Bağlandı", "connected");
+                        updateHostControlsVisibility();
                         
                         // Odadaki diğer katılımcılarla bağlantı kur
                         for (const peer of msg.peers || []) {
-                            addParticipant(peer.id, peer.name);
+                            addOrUpdateParticipant(peer.id, peer.name, false, peer.isHost);
                             appendSystemMessage(`${peer.name} odada`);
                             await startCallToPeer(peer.id, peer.name);
                         }
                         break;
                         
                     case "peer-joined":
-                        addParticipant(msg.id, msg.name);
+                        addOrUpdateParticipant(msg.id, msg.name, false, msg.isHost);
                         appendSystemMessage(`${msg.name} katıldı`);
                         // Yeni katılan için PC hazırla (o offer gönderecek)
                         await getOrCreatePeerConnection(msg.id, msg.name);
@@ -657,6 +902,39 @@
                         
                     case "chat":
                         appendMessage(msg.from, msg.text, msg.senderId === clientId);
+                        break;
+
+                    case "room-lock":
+                        roomLocked = msg.locked;
+                        updateLockButtonUI();
+                        appendSystemMessage(
+                            roomLocked
+                                ? "Oda kilitlendi, yeni katılımcılar alınmayacak."
+                                : "Oda kilidi kaldırıldı, yeni katılımcılar katılabilir."
+                        );
+                        break;
+
+                    case "host-changed":
+                        hostId = msg.hostId;
+                        isHostUser = (hostId === clientId);
+                        participants.forEach((p, id) => {
+                            p.isHost = (id === hostId);
+                        });
+                        updateHostControlsVisibility();
+                        const newHostName = participants.get(hostId)?.name || "Biri";
+                        appendSystemMessage(`${newHostName} toplantı sahibi oldu.`);
+                        break;
+
+                    case "control":
+                        if (msg.action === "mute-mic") {
+                            // Host tarafından mikrofon kapatıldı
+                            if (localStream) {
+                                localStream.getAudioTracks().forEach(t => (t.enabled = false));
+                            }
+                            micEnabled = false;
+                            updateMicUI();
+                            appendSystemMessage("Toplantı sahibi mikrofonunu kapattı.");
+                        }
                         break;
                         
                     case "full":
@@ -771,14 +1049,10 @@
                     
                     // Tüm peer'lara ekran track'ini gönder
                     peers.forEach((peerInfo, peerId) => {
-                        let sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
+                        const sender = peerInfo.videoSender;
                         if (sender) {
-                            console.log(`[SCREEN] Track değiştiriliyor: ${peerId}`);
+                            console.log(`[SCREEN] Video track ekran ile değiştiriliyor: ${peerId}`);
                             sender.replaceTrack(screenTrack);
-                        } else {
-                            // Eğer daha önce video sender yoksa (örn. hiç kamera yoksa), yeni track ekle
-                            console.log(`[SCREEN] Yeni video track ekleniyor: ${peerId}`);
-                            peerInfo.pc.addTrack(screenTrack, screenStream);
                         }
                     });
                     
@@ -811,18 +1085,16 @@
             
             console.log("[SCREEN] Ekran paylaşımı durduruluyor...");
             
-            // Kamera track'ine geri dön
-            const cameraTrack = localStream?.getVideoTracks()[0];
+            // Kamera track'ine geri dön (varsa)
+            const cameraTrack = localStream?.getVideoTracks()[0] || null;
             
-            if (cameraTrack) {
-                peers.forEach((peerInfo, peerId) => {
-                    const sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
-                    if (sender) {
-                        console.log(`[SCREEN] Kamera track'ine dönülüyor: ${peerId}`);
-                        sender.replaceTrack(cameraTrack);
-                    }
-                });
-            }
+            peers.forEach((peerInfo, peerId) => {
+                const sender = peerInfo.videoSender;
+                if (sender) {
+                    console.log(`[SCREEN] Kamera track'ine (veya boş) dönülüyor: ${peerId}`);
+                    sender.replaceTrack(cameraTrack);
+                }
+            });
             
             // Screen stream'i kapat
             if (screenStream) {
@@ -881,6 +1153,8 @@
             }
             
             peers.forEach((_, id) => removePeer(id));
+
+            stopSpeakingMonitor("local");
         }
 
         // Sayfa kapatılırken temizlik
@@ -895,16 +1169,9 @@
             console.log("[INIT] Oda:", roomCode);
             console.log("[INIT] Kullanıcı:", userName);
             
-            // İlk olarak medya izni iste
+            // Sadece uyarıyı göster; medya izni kullanıcı "İzin Ver"e tıklayınca istenecek
             mediaPermissionWarning.classList.remove("hidden");
-            
-            // Otomatik olarak izin istemeyi dene
-            const hasPermission = await requestMediaPermission();
-            
-            if (!hasPermission) {
-                console.log("[INIT] Medya izni bekleniyor...");
-                // Kullanıcı butona tıklayana kadar bekle
-            }
+            console.log("[INIT] Medya izni bekleniyor (kullanıcı 'İzin Ver' butonuna basacak)...");
         })();
     </script>
 </body>
