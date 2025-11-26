@@ -51,7 +51,7 @@
         }
         /* Daha küçük spotlight */
         @media (min-width: 640px) {
-            /* sm: 2 kolon → spotlight 2 kolon (full) */
+            /* sm: 2 kolon → spotlight 2 kolon */
             .tile-spotlight {
                 grid-column: 1 / span 2;
             }
@@ -806,6 +806,7 @@
             video.autoplay = true;
             video.playsInline = true;
             video.className = "w-full h-full object-cover bg-black";
+            video.muted = false; // remote sesler standartta açık
             
             const labelTop = document.createElement("div");
             labelTop.className = "absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1";
@@ -870,6 +871,13 @@
             const { videoEl, tileEl } = createRemoteTile(peerId, peerName);
             const peerInfo = { pc, stream: null, videoEl, tileEl, name: peerName, videoSender };
             peers.set(peerId, peerInfo);
+
+            // Eğer biz şu anda ekran sesini de paylaşıyorsak,
+            // yankıyı azaltmak için bu yeni remote videoyu da sessize al
+            if (isScreenSharingWithAudio) {
+                videoEl.muted = true;
+                videoEl.dataset.mutedByScreenShare = "1";
+            }
             
             pc.ontrack = (event) => {
                 console.log(`[PEER] Remote track alındı: ${event.track.kind}`);
@@ -1233,6 +1241,18 @@
                             peerInfo.pc.addTrack(screenAudioTrack, screenStream);
                         }
                     });
+
+                    // Eğer ekran sesini de paylaşıyorsak, yankıyı azaltmak için
+                    // kendi tarafımızda remote katılımcıların seslerini sessize al
+                    if (isScreenSharingWithAudio) {
+                        peers.forEach((peerInfo) => {
+                            if (peerInfo.videoEl) {
+                                peerInfo.videoEl.muted = true;
+                                peerInfo.videoEl.dataset.mutedByScreenShare = "1";
+                            }
+                        });
+                        appendSystemMessage("Ekran sesi paylaşılıyor, yankıyı azaltmak için toplantı sesini senin tarafında susturduk.");
+                    }
                     
                     isScreenSharing = true;
                     currentScreenSharerId = clientId;
@@ -1244,7 +1264,7 @@
                             ? "Ekran + sekme/pencere sesi paylaşılıyor (tarayıcı seçimindeki sese göre)."
                             : "Ekran paylaşımı başladı (tarayıcıdaki seçeneklere göre ses olmayabilir)."
                     );
-                    
+
                     screenVideoTrack.onended = () => {
                         console.log("[SCREEN] Ekran paylaşımı kullanıcı tarafından durduruldu");
                         stopScreenShare();
@@ -1278,6 +1298,14 @@
                 screenStream.getTracks().forEach(t => t.stop());
                 screenStream = null;
             }
+
+            // Bizim tarafta ekran sesi yüzünden mute edilen remote videoları geri aç
+            peers.forEach((peerInfo) => {
+                if (peerInfo.videoEl && peerInfo.videoEl.dataset.mutedByScreenShare === "1") {
+                    peerInfo.videoEl.muted = false;
+                    delete peerInfo.videoEl.dataset.mutedByScreenShare;
+                }
+            });
             
             hideSelfScreenTile();
             
