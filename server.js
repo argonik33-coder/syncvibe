@@ -1,202 +1,243 @@
-// server.js
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+// VibeZone - Express + WebSocket (ws) sinyal sunucusu
+// HTTP:  http://localhost:3000
+// WS:    ws://localhost:3000
+
+const path = require("path");
+const http = require("http");
+const express = require("express");
+const WebSocket = require("ws");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const wss = new WebSocket.Server({ server });
 
-// /public klasörünü statik olarak sun
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Kök URL -> index.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Kullanıcıları takip etmek için: socket.id -> { name, room }
-const users = {};
-
-// Mesaj geçmişi: room -> [ { user, text, time, from } ]
-const roomMessages = {};
-
-function getUsersInRoom(room) {
-  return Object.entries(users)
-    .filter(([, u]) => u.room === room)
-    .map(([id, u]) => ({ id, name: u.name }));
-}
-
-function getRoomHistory(room) {
-  return roomMessages[room] || [];
-}
-
-io.on('connection', (socket) => {
-  console.log('Yeni bağlantı:', socket.id);
-
-  // Odaya/kanala katılma
-  socket.on('joinRoom', (payload) => {
-    let room, user;
-
-    if (typeof payload === 'string') {
-      room = payload;
-      user = 'Misafir';
-    } else if (payload && typeof payload === 'object') {
-      room = payload.room;
-      user = payload.user || 'Misafir';
-    }
-
-    if (!room) return;
-
-    const prevRoom = socket.roomName;
-    const prevUser = users[socket.id];
-
-    // Eski odadan çık
-    if (prevRoom) {
-      socket.leave(prevRoom);
-    }
-
-    // Yeni odaya gir
-    socket.join(room);
-    socket.roomName = room;
-
-    // Kullanıcı kaydı
-    if (!users[socket.id]) {
-      users[socket.id] = { name: user, room };
-    } else {
-      users[socket.id].name = user;
-      users[socket.id].room = room;
-    }
-
-    // Eski odanın kullanıcı listesini güncelle + peer-left + sistem mesajı
-    if (prevRoom && prevRoom !== room) {
-      const prevUsers = getUsersInRoom(prevRoom);
-      io.to(prevRoom).emit('roomUsers', { room: prevRoom, users: prevUsers });
-
-      // WebRTC için ayrılan peer
-      socket.to(prevRoom).emit('peer-left', { id: socket.id });
-
-      // Sistem mesajı
-      io.to(prevRoom).emit('systemMessage', {
-        room: prevRoom,
-        text: `${(prevUser && prevUser.name) || 'Bir kullanıcı'} kanaldan ayrıldı`,
-        time: new Date().toISOString()
-      });
-    }
-
-    // Yeni odanın kullanıcı listesini gönder
-    const roomUsers = getUsersInRoom(room);
-    io.to(room).emit('roomUsers', { room, users: roomUsers });
-
-    // Bu kullanıcıya oda mesaj geçmişini gönder
-    const history = getRoomHistory(room);
-    socket.emit('roomHistory', { room, messages: history });
-
-    // Diğer kullanıcılara sistem mesajı: kanala katıldı
-    socket.to(room).emit('systemMessage', {
-      room,
-      text: `${user} kanala katıldı`,
-      time: new Date().toISOString()
-    });
-
-    console.log(`${socket.id} odaya katıldı: ${room} (${user})`);
-  });
-
-  // Yazılı sohbet mesajı
-  socket.on('chatMessage', ({ room, user, text }) => {
-    if (!room || !text) return;
-
-    const msg = {
-      user,
-      text,
-      time: new Date().toISOString(),
-      from: socket.id
-    };
-
-    if (!roomMessages[room]) {
-      roomMessages[room] = [];
-    }
-    roomMessages[room].push(msg);
-
-    if (roomMessages[room].length > 100) {
-      roomMessages[room].shift();
-    }
-
-    console.log(`[${room}] ${user}: ${text}`);
-
-    io.to(room).emit('chatMessage', msg);
-  });
-
-  // Yazıyor / typing
-  socket.on('typing', ({ room, user }) => {
-    if (!room) return;
-    socket.to(room).emit('typing', { room, user: user || 'Misafir' });
-  });
-
-  socket.on('stopTyping', ({ room, user }) => {
-    if (!room) return;
-    socket.to(room).emit('stopTyping', { room, user: user || 'Misafir' });
-  });
-
-  // WebRTC: Çoklu katılımcı için to/from bazlı sinyalleme
-
-  // OFFER: { room, to, from, offer, hasVideo }
-  socket.on('webrtc-offer', ({ room, to, offer, hasVideo }) => {
-    if (!room || !offer || !to) return;
-    io.to(to).emit('webrtc-offer', {
-      room,
-      from: socket.id,
-      offer,
-      hasVideo
-    });
-  });
-
-  // ANSWER: { room, to, from, answer }
-  socket.on('webrtc-answer', ({ room, to, answer }) => {
-    if (!room || !answer || !to) return;
-    io.to(to).emit('webrtc-answer', {
-      room,
-      from: socket.id,
-      answer
-    });
-  });
-
-  // ICE CANDIDATE: { room, to, from, candidate }
-  socket.on('webrtc-ice-candidate', ({ room, to, candidate }) => {
-    if (!room || !candidate || !to) return;
-    io.to(to).emit('webrtc-ice-candidate', {
-      room,
-      from: socket.id,
-      candidate
-    });
-  });
-
-  // Bağlantı koptuğunda
-  socket.on('disconnect', () => {
-    console.log('Bağlantı koptu:', socket.id);
-    const user = users[socket.id];
-    if (user) {
-      const room = user.room;
-      delete users[socket.id];
-
-      const roomUsers = getUsersInRoom(room);
-      io.to(room).emit('roomUsers', { room, users: roomUsers });
-
-      // WebRTC peer'lere bildir
-      socket.to(room).emit('peer-left', { id: socket.id });
-
-      // Sistem mesajı
-      io.to(room).emit('systemMessage', {
-        room,
-        text: `${user.name || 'Bir kullanıcı'} odadan ayrıldı`,
-        time: new Date().toISOString()
-      });
-    }
-  });
-});
+// Statik dosyalar (index.html, room.html)
+app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`SyncVibe sunucu çalışıyor: http://localhost:${PORT}`);
+    console.log(`VibeZone sunucusu http://localhost:${PORT} üzerinde çalışıyor`);
+});
+
+// roomCode -> { peers: WebSocket[], hostId: string|null, locked: boolean }
+const rooms = {};
+const MAX_PER_ROOM = 8; // Oda kapasitesi
+
+function broadcast(roomObj, payload) {
+    const msg = JSON.stringify(payload);
+    roomObj.peers.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(msg);
+        }
+    });
+}
+
+function findRoomOf(ws) {
+    const roomCode = ws.room;
+    if (!roomCode) return null;
+    return rooms[roomCode] || null;
+}
+
+wss.on("connection", (ws) => {
+    ws.id = Math.random().toString(36).substring(2, 10);
+
+    ws.on("message", (message) => {
+        let data;
+        try {
+            data = JSON.parse(message);
+        } catch (e) {
+            console.error("Geçersiz JSON:", e);
+            return;
+        }
+
+        if (data.type === "join") {
+            const room = data.room;
+            const name = (data.name || "Misafir").toString().substring(0, 32);
+
+            if (!room || !/^\d{6}$/.test(room)) {
+                ws.send(JSON.stringify({ type: "error", message: "Geçersiz oda kodu" }));
+                return;
+            }
+
+            let roomObj = rooms[room];
+
+            // İlk kullanıcı odayı oluşturur ve host olur
+            if (!roomObj) {
+                roomObj = rooms[room] = {
+                    peers: [],
+                    hostId: ws.id,
+                    locked: false
+                };
+            }
+
+            if (roomObj.locked) {
+                ws.send(JSON.stringify({ type: "locked" }));
+                return;
+            }
+
+            if (roomObj.peers.length >= MAX_PER_ROOM) {
+                ws.send(JSON.stringify({ type: "full", max: MAX_PER_ROOM }));
+                return;
+            }
+
+            ws.room = room;
+            ws.name = name;
+
+            const existingPeers = roomObj.peers.map((p) => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.id === roomObj.hostId
+            }));
+
+            roomObj.peers.push(ws);
+
+            ws.send(
+                JSON.stringify({
+                    type: "joined",
+                    id: ws.id,
+                    isHost: ws.id === roomObj.hostId,
+                    hostId: roomObj.hostId,
+                    locked: roomObj.locked,
+                    peers: existingPeers
+                })
+            );
+
+            // Diğer kullanıcılara yeni katılımcıyı bildir
+            roomObj.peers.forEach((client) => {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(
+                        JSON.stringify({
+                            type: "peer-joined",
+                            id: ws.id,
+                            name: ws.name,
+                            isHost: false
+                        })
+                    );
+                }
+            });
+        } else if (data.type === "signal") {
+            // WebRTC sinyalleri: belirli hedefe ilet
+            const roomObj = findRoomOf(ws);
+            if (!roomObj) return;
+
+            const targetId = data.to;
+            if (!targetId) return;
+
+            const target = roomObj.peers.find((c) => c.id === targetId);
+            if (target && target.readyState === WebSocket.OPEN) {
+                target.send(
+                    JSON.stringify({
+                        type: "signal",
+                        from: ws.id,
+                        data: data.data
+                    })
+                );
+            }
+        } else if (data.type === "chat") {
+            // Oda içi sohbet
+            const roomObj = findRoomOf(ws);
+            if (!roomObj) return;
+            const text = (data.text || "").toString().slice(0, 500);
+            if (!text) return;
+
+            const payload = JSON.stringify({
+                type: "chat",
+                from: ws.name,
+                text,
+                senderId: ws.id
+            });
+
+            roomObj.peers.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(payload);
+                }
+            });
+        } else if (data.type === "control") {
+            // Host kontrolleri (oda kilitle, uzak mute vb.)
+            const roomObj = findRoomOf(ws);
+            if (!roomObj) return;
+
+            // Sadece host kontrol gönderebilir
+            if (roomObj.hostId !== ws.id) return;
+
+            const action = data.action;
+
+            if (action === "lock-room") {
+                roomObj.locked = !!data.value;
+                broadcast(roomObj, {
+                    type: "room-lock",
+                    locked: roomObj.locked
+                });
+            } else if (action === "mute-mic") {
+                const targetId = data.targetId;
+                if (!targetId) return;
+                const target = roomObj.peers.find((c) => c.id === targetId);
+                if (target && target.readyState === WebSocket.OPEN) {
+                    target.send(
+                        JSON.stringify({
+                            type: "control",
+                            action: "mute-mic"
+                        })
+                    );
+                }
+            }
+        } else if (data.type === "status") {
+            // Örn: el kaldırma
+            const roomObj = findRoomOf(ws);
+            if (!roomObj) return;
+
+            broadcast(roomObj, {
+                type: "status",
+                action: data.action,
+                id: ws.id,
+                value: data.value
+            });
+        } else if (data.type === "reaction") {
+            // Emoji reaksiyonları
+            const roomObj = findRoomOf(ws);
+            if (!roomObj) return;
+            const emoji = (data.emoji || "").toString().slice(0, 8);
+            if (!emoji) return;
+
+            broadcast(roomObj, {
+                type: "reaction",
+                id: ws.id,
+                emoji
+            });
+        }
+    });
+
+    ws.on("close", () => {
+        const room = ws.room;
+        if (!room || !rooms[room]) return;
+
+        const roomObj = rooms[room];
+        roomObj.peers = roomObj.peers.filter((c) => c !== ws);
+
+        if (roomObj.peers.length === 0) {
+            delete rooms[room];
+            return;
+        }
+
+        // Diğer kullanıcılara ayrılan kişiyi bildir
+        broadcast(roomObj, {
+            type: "peer-left",
+            id: ws.id,
+            name: ws.name
+        });
+
+        // Host ayrıldıysa yeni host ata
+        if (roomObj.hostId === ws.id) {
+            const newHost = roomObj.peers[0];
+            roomObj.hostId = newHost.id;
+            broadcast(roomObj, {
+                type: "host-changed",
+                hostId: roomObj.hostId
+            });
+        }
+    });
+
+    ws.on("error", (err) => {
+        console.error("WebSocket hata:", err);
+    });
 });
