@@ -90,7 +90,7 @@
                 width: 100%;
                 max-width: 100%;
                 z-index: 40;
-                background-color: rgba(15, 23, 42, 0.98); /* neredeyse tam koyu arka plan */
+                background-color: rgba(15, 23, 42, 0.98);
             }
         }
     </style>
@@ -834,10 +834,21 @@
             const labelBottom = document.createElement("div");
             labelBottom.className = "absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1";
             labelBottom.innerHTML = `<i class="fa-solid fa-microphone text-emerald-400"></i><span>${peerName}</span>`;
+
+            // Kamera kapalı overlay'i (remote)
+            const camOffOverlay = document.createElement("div");
+            camOffOverlay.className = "remote-cam-off absolute inset-0 bg-slate-900 flex items-center justify-center hidden";
+            camOffOverlay.innerHTML = `
+                <div class="text-center">
+                    <i class="fa-solid fa-video-slash text-4xl text-slate-600 mb-2"></i>
+                    <p class="text-sm text-slate-500">Kamera kapalı</p>
+                </div>
+            `;
             
             tile.appendChild(video);
             tile.appendChild(labelTop);
             tile.appendChild(labelBottom);
+            tile.appendChild(camOffOverlay);
             videoGrid.appendChild(tile);
             
             return { videoEl: video, tileEl: tile };
@@ -1005,6 +1016,9 @@
                             appendSystemMessage(`${peer.name} odada`);
                             await startCallToPeer(peer.id, peer.name);
                         }
+
+                        // İlk kamera durumu (kameran varsa)
+                        sendStatus("camera", camEnabled && hasCamera && (localStream?.getVideoTracks().length || 0) > 0);
                         break;
                         
                     case "peer-joined":
@@ -1091,6 +1105,23 @@
                                 }
                                 if (msg.id !== clientId) {
                                     appendSystemMessage(`${(p && p.name) || "Biri"} ekran paylaşımını durdurdu.`);
+                                }
+                            }
+                        } else if (msg.action === "camera") {
+                            // Kamera aç/kapat durumu
+                            if (msg.id === clientId) {
+                                // Kendi kameramı zaten local UI'dan yönetiyoruz, istersen senkron da edilebilir
+                            } else {
+                                const peerInfo = peers.get(msg.id);
+                                if (peerInfo && peerInfo.tileEl) {
+                                    const overlay = peerInfo.tileEl.querySelector(".remote-cam-off");
+                                    if (overlay) {
+                                        if (msg.value) {
+                                            overlay.classList.add("hidden");
+                                        } else {
+                                            overlay.classList.remove("hidden");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1197,6 +1228,8 @@
             camEnabled = !camEnabled;
             localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
             updateCamUI();
+            // Kamera durumu diğerlerine bildirilsin
+            sendStatus("camera", camEnabled && hasCamera && (localStream.getVideoTracks().length || 0) > 0);
         });
 
         // El kaldır
