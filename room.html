@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>VibeZone Oda</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        body { background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%); }
+        
+        /* Chat container - sabit yükseklik ve scroll */
+        #chatMessages {
+            height: 300px;
+            max-height: 300px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        
+        /* Scrollbar stillemesi */
+        #chatMessages::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chatMessages::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        #chatMessages::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        #chatMessages::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* Video grid responsive */
+        #videoGrid {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-slate-100 overflow-hidden">
+    <!-- Header -->
+    <header class="flex-shrink-0 w-full bg-slate-950/95 border-b border-slate-800">
+        <div class="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                    <i class="fa-solid fa-headset text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-lg">VibeZone</span>
+                        <span id="roomCodeBadge" class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono">
+                            #<span id="roomCodeText">------</span>
+                        </span>
+                        <button id="copyCodeBtn" class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs hover:bg-slate-800">
+                            <i class="fa-solid fa-copy"></i> Kopyala
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-400">Sen: <span id="currentUserName" class="text-slate-200"></span></p>
+                </div>
+            </div>
+            <div id="connectionStatus" class="flex items-center gap-2 text-xs">
+                <span class="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-900/50 border border-yellow-700 text-yellow-400">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Bağlanıyor...</span>
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        <!-- Video Grid -->
+        <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden">
+            <div id="videoGrid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto">
+                <!-- Local Video -->
+                <div id="localTile" class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
+                    <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover bg-black"></video>
+                    <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1">
+                        <span id="localStatusDot" class="h-2 w-2 rounded-full bg-yellow-400"></span>
+                        <span>Sen</span>
+                    </div>
+                    <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1">
+                        <i id="localMicIcon" class="fa-solid fa-microphone text-emerald-400"></i>
+                        <span id="selfNameTag">Kullanıcı</span>
+                    </div>
+                    <!-- Kamera kapalıyken gösterilecek -->
+                    <div id="localCamOff" class="absolute inset-0 bg-slate-900 flex items-center justify-center hidden">
+                        <div class="text-center">
+                            <i class="fa-solid fa-video-slash text-4xl text-slate-600 mb-2"></i>
+                            <p class="text-sm text-slate-500">Kamera kapalı</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Medya izni uyarısı -->
+            <div id="mediaPermissionWarning" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-50">
+                <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md text-center">
+                    <i class="fa-solid fa-video text-5xl text-indigo-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Kamera ve Mikrofon İzni Gerekli</h2>
+                    <p class="text-sm text-slate-400 mb-4">
+                        Toplantıya katılmak için tarayıcınızın kamera ve mikrofon erişimine izin vermeniz gerekiyor.
+                    </p>
+                    <button id="requestMediaBtn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium">
+                        <i class="fa-solid fa-unlock mr-2"></i>İzin Ver
+                    </button>
+                    <p id="mediaError" class="mt-3 text-xs text-rose-400 hidden"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Side Panel -->
+        <aside id="sidePanel" class="hidden lg:flex flex-col w-80 border-l border-slate-800 bg-slate-950/95 flex-shrink-0">
+            <!-- Katılımcılar -->
+            <div class="flex-shrink-0 border-b border-slate-800">
+                <div class="px-4 py-3 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold">Katılımcılar (<span id="participantCount">1</span>)</h2>
+                </div>
+                <ul id="participantsList" class="px-3 pb-3 space-y-1 text-xs max-h-32 overflow-y-auto"></ul>
+            </div>
+            
+            <!-- Sohbet -->
+            <div class="flex-1 flex flex-col min-h-0">
+                <div class="flex-shrink-0 px-4 py-2 border-b border-slate-800">
+                    <h3 class="text-sm font-semibold">Sohbet</h3>
+                </div>
+                
+                <!-- Chat mesajları - SABİT YÜKSEKLİK -->
+                <div id="chatMessages" class="flex-1 px-4 py-2 space-y-2 text-sm overflow-y-auto">
+                    <div class="text-center text-[11px] text-slate-500 py-2">
+                        Sohbete hoş geldin!
+                    </div>
+                </div>
+                
+                <!-- Chat input -->
+                <form id="chatForm" class="flex-shrink-0 border-t border-slate-800 px-3 py-2 flex gap-2">
+                    <input id="chatInput" type="text" autocomplete="off" 
+                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" 
+                        placeholder="Mesaj yaz..." />
+                    <button type="submit" class="h-10 w-10 rounded-full bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-sm"></i>
+                    </button>
+                </form>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Controls -->
+    <footer class="flex-shrink-0 border-t border-slate-800 bg-slate-950/95">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-center gap-2 sm:gap-3">
+            <button id="btnMic" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Mikrofon">
+                <i class="fa-solid fa-microphone text-lg"></i>
+            </button>
+            <button id="btnCam" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Kamera">
+                <i class="fa-solid fa-video text-lg"></i>
+            </button>
+            <button id="btnScreen" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Ekran Paylaş">
+                <i class="fa-solid fa-display text-lg"></i>
+            </button>
+            <button id="btnChatToggle" class="lg:hidden h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Sohbet">
+                <i class="fa-solid fa-comments text-lg"></i>
+            </button>
+            <div class="w-px h-8 bg-slate-700 mx-1"></div>
+            <button id="leaveBtn" class="h-12 px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-sm font-semibold flex items-center gap-2 transition-colors">
+                <i class="fa-solid fa-phone-slash"></i>
+                <span class="hidden sm:inline">Ayrıl</span>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        // URL PARAMETRELERİ
+        // ═══════════════════════════════════════════════════════════════
+        
+        const params = new URLSearchParams(window.location.search);
+        let roomCode = params.get("room");
+        let userName = params.get("name") || "Misafir" + Math.floor(100 + Math.random() * 900);
+
+        if (!roomCode || !/^\d{6}$/.test(roomCode)) {
+            window.location.href = "index.html";
+        }
+
+        document.getElementById("roomCodeText").textContent = roomCode;
+        document.getElementById("currentUserName").textContent = userName;
+        document.getElementById("selfNameTag").textContent = userName;
+
+        // ═══════════════════════════════════════════════════════════════
+        // DOM ELEMANLARI
+        // ═══════════════════════════════════════════════════════════════
+        
+        const localVideo = document.getElementById("localVideo");
+        const localCamOff = document.getElementById("localCamOff");
+        const localStatusDot = document.getElementById("localStatusDot");
+        const localMicIcon = document.getElementById("localMicIcon");
+        const videoGrid = document.getElementById("videoGrid");
+        const sidePanel = document.getElementById("sidePanel");
+        const participantsList = document.getElementById("participantsList");
+        const participantCountEl = document.getElementById("participantCount");
+        const chatForm = document.getElementById("chatForm");
+        const chatInput = document.getElementById("chatInput");
+        const chatMessages = document.getElementById("chatMessages");
+        const connectionStatus = document.getElementById("connectionStatus");
+        const mediaPermissionWarning = document.getElementById("mediaPermissionWarning");
+        const requestMediaBtn = document.getElementById("requestMediaBtn");
+        const mediaError = document.getElementById("mediaError");
+
+        const btnMic = document.getElementById("btnMic");
+        const btnCam = document.getElementById("btnCam");
+        const btnScreen = document.getElementById("btnScreen");
+        const btnChatToggle = document.getElementById("btnChatToggle");
+        const leaveBtn = document.getElementById("leaveBtn");
+        const copyCodeBtn = document.getElementById("copyCodeBtn");
+
+        // ═══════════════════════════════════════════════════════════════
+        // DURUM DEĞİŞKENLERİ
+        // ═══════════════════════════════════════════════════════════════
+        
+        const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        
+        let localStream = null;
+        let screenStream = null;
+        let isScreenSharing = false;
+        let micEnabled = true;
+        let camEnabled = true;
+        let socket = null;
+        let clientId = null;
+        let mediaReady = false;
+
+        const peers = new Map();
+        const participants = new Map();
+
+        const signalingServerUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+
+        // ═══════════════════════════════════════════════════════════════
+        // BAĞLANTI DURUMU
+        // ═══════════════════════════════════════════════════════════════
+        
+        function updateConnectionStatus(status, type = 'info') {
+            const colors = {
+                'connecting': 'bg-yellow-900/50 border-yellow-700 text-yellow-400',
+                'connected': 'bg-emerald-900/50 border-emerald-700 text-emerald-400',
+                'error': 'bg-rose-900/50 border-rose-700 text-rose-400'
+            };
+            const icons = {
+                'connecting': '<i class="fa-solid fa-spinner fa-spin"></i>',
+                'connected': '<i class="fa-solid fa-circle"></i>',
+                'error': '<i class="fa-solid fa-exclamation-triangle"></i>'
+            };
+            
+            connectionStatus.innerHTML = `
+                <span class="flex items-center gap-1 px-2 py-1 rounded-full ${colors[type]} text-xs">
+                    ${icons[type]}
+                    <span>${status}</span>
+                </span>
+            `;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MEDYA YÖNETİMİ
+        // ═══════════════════════════════════════════════════════════════
+        
+        async function requestMediaPermission() {
+            try {
+                console.log("[MEDYA] İzin isteniyor...");
+                
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }, 
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: "user"
+                    }
+                });
+                
+                console.log("[MEDYA] İzin verildi, stream alındı");
+                
+                localVideo.srcObject = localStream;
+                mediaReady = true;
+                
+                // İzin uyarısını gizle
+                mediaPermissionWarning.classList.add("hidden");
+                
+                // Durum göstergesini güncelle
+                localStatusDot.classList.remove("bg-yellow-400");
+                localStatusDot.classList.add("bg-emerald-400");
+                
+                // Butonları güncelle
+                updateMicUI();
+                updateCamUI();
+                
+                // WebSocket bağlantısını başlat
+                connectSignaling();
+                
+                return true;
+            } catch (err) {
+                console.error("[MEDYA] İzin hatası:", err);
+                
+                let errorMessage = "Bilinmeyen hata";
+                
+                if (err.name === "NotAllowedError") {
+                    errorMessage = "Kamera/mikrofon izni reddedildi. Tarayıcı ayarlarından izin verin.";
+                } else if (err.name === "NotFoundError") {
+                    errorMessage = "Kamera veya mikrofon bulunamadı.";
+                } else if (err.name === "NotReadableError") {
+                    errorMessage = "Kamera veya mikrofon başka bir uygulama tarafından kullanılıyor.";
+                } else if (err.name === "OverconstrainedError") {
+                    errorMessage = "İstenen video ayarları desteklenmiyor.";
+                }
+                
+                mediaError.textContent = errorMessage;
+                mediaError.classList.remove("hidden");
+                
+                return false;
+            }
+        }
+        
+        // İzin butonu tıklaması
+        requestMediaBtn.addEventListener("click", requestMediaPermission);
+
+        // ═══════════════════════════════════════════════════════════════
+        // KATILIMCI LİSTESİ
+        // ═══════════════════════════════════════════════════════════════
+        
+        function updateParticipantCount() {
+            participantCountEl.textContent = participants.size;
+        }
+
+        function addParticipant(id, name, isSelf = false) {
+            if (participants.has(id)) return;
+            
+            const li = document.createElement("li");
+            li.className = "flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-900/70";
+            li.innerHTML = `
+                <span class="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                <span class="truncate">${name}</span>
+                ${isSelf ? '<span class="text-sky-400 text-[10px] flex-shrink-0">(Sen)</span>' : ''}
+            `;
+            participantsList.appendChild(li);
+            participants.set(id, { name, el: li, isSelf });
+            updateParticipantCount();
+        }
+
+        function removeParticipant(id) {
+            const info = participants.get(id);
+            if (info && info.el) info.el.remove();
+            participants.delete(id);
+            updateParticipantCount();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SOHBET
+        // ═══════════════════════════════════════════════════════════════
+        
+        function scrollChatToBottom() {
+            // Küçük bir gecikme ile scroll yap (DOM güncellemesi için)
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 10);
+        }
+
+        function appendMessage(author, text, self = false) {
+            const div = document.createElement("div");
+            div.className = `flex ${self ? "justify-end" : "justify-start"}`;
+            
+            const time = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+            
+            div.innerHTML = `
+                <div class="max-w-[85%] px-3 py-2 rounded-2xl text-sm ${self ? "bg-violet-600 text-white rounded-br-sm" : "bg-slate-800 text-slate-100 rounded-bl-sm"}">
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <span class="text-[11px] font-medium ${self ? "text-violet-200" : "text-slate-400"}">${author}</span>
+                        <span class="text-[10px] ${self ? "text-violet-300" : "text-slate-500"}">${time}</span>
+                    </div>
+                    <div class="break-words">${escapeHtml(text)}</div>
+                </div>
+            `;
+            chatMessages.appendChild(div);
+            scrollChatToBottom();
+        }
+
+        function appendSystemMessage(text) {
+            const div = document.createElement("div");
+            div.className = "text-center py-1";
+            div.innerHTML = `<span class="text-[11px] text-slate-500 bg-slate-900/50 px-3 py-1 rounded-full">${text}</span>`;
+            chatMessages.appendChild(div);
+            scrollChatToBottom();
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        chatForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+            socket.send(JSON.stringify({ type: "chat", room: roomCode, text }));
+            chatInput.value = "";
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // VIDEO TILE
+        // ═══════════════════════════════════════════════════════════════
+        
+        function createRemoteTile(peerId, peerName) {
+            const tile = document.createElement("div");
+            tile.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video";
+            tile.dataset.peerId = peerId;
+            
+            const video = document.createElement("video");
+            video.autoplay = true;
+            video.playsInline = true;
+            video.className = "w-full h-full object-cover bg-black";
+            
+            const labelTop = document.createElement("div");
+            labelTop.className = "absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1";
+            labelTop.innerHTML = `<span class="h-2 w-2 rounded-full bg-emerald-400 peer-status-dot"></span><span>Katılımcı</span>`;
+            
+            const labelBottom = document.createElement("div");
+            labelBottom.className = "absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1";
+            labelBottom.innerHTML = `<i class="fa-solid fa-microphone text-emerald-400"></i><span>${peerName}</span>`;
+            
+            tile.appendChild(video);
+            tile.appendChild(labelTop);
+            tile.appendChild(labelBottom);
+            videoGrid.appendChild(tile);
+            
+            return { videoEl: video, tileEl: tile };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // WEBRTC PEER BAĞLANTISI
+        // ═══════════════════════════════════════════════════════════════
+        
+        async function getOrCreatePeerConnection(peerId, peerName) {
+            if (peers.has(peerId)) return peers.get(peerId);
+            
+            if (!localStream) {
+                console.error("[PEER] Local stream yok!");
+                return null;
+            }
+            
+            console.log(`[PEER] Yeni bağlantı oluşturuluyor: ${peerName}`);
+            
+            const pc = new RTCPeerConnection(iceConfig);
+            
+            // Local stream track'lerini ekle
+            localStream.getTracks().forEach(track => {
+                console.log(`[PEER] Track ekleniyor: ${track.kind}`);
+                pc.addTrack(track, localStream);
+            });
+            
+            const { videoEl, tileEl } = createRemoteTile(peerId, peerName);
+            const peerInfo = { pc, stream: null, videoEl, tileEl, name: peerName };
+            peers.set(peerId, peerInfo);
+            
+            // Remote track geldiğinde
+            pc.ontrack = (event) => {
+                console.log(`[PEER] Remote track alındı: ${event.track.kind}`);
+                const [remoteStream] = event.streams;
+                peerInfo.stream = remoteStream;
+                videoEl.srcObject = remoteStream;
+            };
+            
+            // ICE candidate
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log("[PEER] ICE candidate gönderiliyor");
+                    sendSignal(peerId, { type: "candidate", candidate: event.candidate });
+                }
+            };
+            
+            // Bağlantı durumu
+            pc.onconnectionstatechange = () => {
+                console.log(`[PEER] Bağlantı durumu: ${pc.connectionState}`);
+                if (pc.connectionState === "connected") {
+                    const dot = tileEl.querySelector(".peer-status-dot");
+                    if (dot) {
+                        dot.classList.remove("bg-yellow-400");
+                        dot.classList.add("bg-emerald-400");
+                    }
+                }
+            };
+            
+            pc.oniceconnectionstatechange = () => {
+                console.log(`[PEER] ICE durumu: ${pc.iceConnectionState}`);
+            };
+            
+            return peerInfo;
+        }
+
+        function removePeer(peerId) {
+            const peerInfo = peers.get(peerId);
+            if (!peerInfo) return;
+            
+            console.log(`[PEER] Bağlantı kapatılıyor: ${peerInfo.name}`);
+            
+            try { 
+                peerInfo.pc.close(); 
+            } catch (e) {
+                console.error("[PEER] Kapatma hatası:", e);
+            }
+            
+            if (peerInfo.tileEl) {
+                peerInfo.tileEl.remove();
+            }
+            
+            peers.delete(peerId);
+        }
+
+        async function handleSignal(fromId, data) {
+            const peerName = participants.get(fromId)?.name || "Katılımcı";
+            const peerInfo = await getOrCreatePeerConnection(fromId, peerName);
+            if (!peerInfo) return;
+            
+            const pc = peerInfo.pc;
+            
+            try {
+                if (data.type === "offer") {
+                    console.log("[SIGNAL] Offer alındı");
+                    await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    sendSignal(fromId, { type: "answer", sdp: answer });
+                    console.log("[SIGNAL] Answer gönderildi");
+                } else if (data.type === "answer") {
+                    console.log("[SIGNAL] Answer alındı");
+                    await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                } else if (data.type === "candidate") {
+                    console.log("[SIGNAL] ICE candidate alındı");
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            } catch (err) {
+                console.error("[SIGNAL] Hata:", err);
+            }
+        }
+
+        async function startCallToPeer(peerId, peerName) {
+            console.log(`[CALL] Arama başlatılıyor: ${peerName}`);
+            
+            const peerInfo = await getOrCreatePeerConnection(peerId, peerName);
+            if (!peerInfo) return;
+            
+            const pc = peerInfo.pc;
+            
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal(peerId, { type: "offer", sdp: offer });
+                console.log("[CALL] Offer gönderildi");
+            } catch (err) {
+                console.error("[CALL] Offer hatası:", err);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // WEBSOCKET SİNYALLEME
+        // ═══════════════════════════════════════════════════════════════
+        
+        function connectSignaling() {
+            console.log("[WS] Bağlanıyor:", signalingServerUrl);
+            updateConnectionStatus("Bağlanıyor...", "connecting");
+            
+            socket = new WebSocket(signalingServerUrl);
+            
+            socket.addEventListener("open", () => {
+                console.log("[WS] Bağlantı açıldı");
+                socket.send(JSON.stringify({ type: "join", room: roomCode, name: userName }));
+            });
+            
+            socket.addEventListener("message", async (event) => {
+                let msg;
+                try { 
+                    msg = JSON.parse(event.data); 
+                } catch { 
+                    return; 
+                }
+                
+                console.log("[WS] Mesaj:", msg.type);
+                
+                switch (msg.type) {
+                    case "joined":
+                        clientId = msg.id;
+                        addParticipant(clientId, userName, true);
+                        appendSystemMessage("Toplantıya bağlandın!");
+                        updateConnectionStatus("Bağlandı", "connected");
+                        
+                        // Odadaki diğer katılımcılarla bağlantı kur
+                        for (const peer of msg.peers || []) {
+                            addParticipant(peer.id, peer.name);
+                            appendSystemMessage(`${peer.name} odada`);
+                            await startCallToPeer(peer.id, peer.name);
+                        }
+                        break;
+                        
+                    case "peer-joined":
+                        addParticipant(msg.id, msg.name);
+                        appendSystemMessage(`${msg.name} katıldı`);
+                        // Yeni katılan için PC hazırla (o offer gönderecek)
+                        await getOrCreatePeerConnection(msg.id, msg.name);
+                        break;
+                        
+                    case "signal":
+                        await handleSignal(msg.from, msg.data);
+                        break;
+                        
+                    case "peer-left":
+                        appendSystemMessage(`${msg.name || "Biri"} ayrıldı`);
+                        removePeer(msg.id);
+                        removeParticipant(msg.id);
+                        break;
+                        
+                    case "chat":
+                        appendMessage(msg.from, msg.text, msg.senderId === clientId);
+                        break;
+                        
+                    case "full":
+                        alert("Oda dolu!");
+                        window.location.href = "index.html";
+                        break;
+                        
+                    case "locked":
+                        alert("Oda kilitli!");
+                        window.location.href = "index.html";
+                        break;
+                }
+            });
+            
+            socket.addEventListener("close", () => {
+                console.log("[WS] Bağlantı kapandı");
+                updateConnectionStatus("Bağlantı kesildi", "error");
+            });
+            
+            socket.addEventListener("error", (err) => {
+                console.error("[WS] Hata:", err);
+                updateConnectionStatus("Bağlantı hatası", "error");
+            });
+        }
+
+        function sendSignal(toId, data) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "signal", room: roomCode, to: toId, data }));
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // KONTROLLER
+        // ═══════════════════════════════════════════════════════════════
+        
+        function updateMicUI() {
+            const icon = btnMic.querySelector("i");
+            if (micEnabled) {
+                btnMic.classList.remove("bg-rose-600");
+                btnMic.classList.add("bg-slate-800");
+                icon.className = "fa-solid fa-microphone text-lg";
+                localMicIcon.className = "fa-solid fa-microphone text-emerald-400";
+            } else {
+                btnMic.classList.remove("bg-slate-800");
+                btnMic.classList.add("bg-rose-600");
+                icon.className = "fa-solid fa-microphone-slash text-lg";
+                localMicIcon.className = "fa-solid fa-microphone-slash text-rose-400";
+            }
+        }
+
+        function updateCamUI() {
+            const icon = btnCam.querySelector("i");
+            if (camEnabled) {
+                btnCam.classList.remove("bg-rose-600");
+                btnCam.classList.add("bg-slate-800");
+                icon.className = "fa-solid fa-video text-lg";
+                localCamOff.classList.add("hidden");
+            } else {
+                btnCam.classList.remove("bg-slate-800");
+                btnCam.classList.add("bg-rose-600");
+                icon.className = "fa-solid fa-video-slash text-lg";
+                localCamOff.classList.remove("hidden");
+            }
+        }
+
+        function updateScreenUI(active) {
+            const icon = btnScreen.querySelector("i");
+            if (active) {
+                btnScreen.classList.remove("bg-slate-800");
+                btnScreen.classList.add("bg-emerald-600");
+                icon.classList.add("text-white");
+            } else {
+                btnScreen.classList.remove("bg-emerald-600");
+                btnScreen.classList.add("bg-slate-800");
+                icon.classList.remove("text-white");
+            }
+        }
+
+        // Mikrofon toggle
+        btnMic.addEventListener("click", () => {
+            if (!localStream) return;
+            micEnabled = !micEnabled;
+            localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+            updateMicUI();
+        });
+
+        // Kamera toggle
+        btnCam.addEventListener("click", () => {
+            if (!localStream) return;
+            camEnabled = !camEnabled;
+            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+            updateCamUI();
+        });
+
+        // Ekran paylaşımı
+        btnScreen.addEventListener("click", async () => {
+            if (!localStream) return;
+            
+            if (!isScreenSharing) {
+                try {
+                    console.log("[SCREEN] Ekran paylaşımı başlatılıyor...");
+                    
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: {
+                            cursor: "always"
+                        },
+                        audio: false
+                    });
+                    
+                    const screenTrack = screenStream.getVideoTracks()[0];
+                    console.log("[SCREEN] Ekran track'i alındı:", screenTrack.label);
+                    
+                    // Tüm peer'lara ekran track'ini gönder
+                    peers.forEach((peerInfo, peerId) => {
+                        const sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
+                        if (sender) {
+                            console.log(`[SCREEN] Track değiştiriliyor: ${peerId}`);
+                            sender.replaceTrack(screenTrack);
+                        }
+                    });
+                    
+                    // Local video'yu ekran paylaşımına çevir
+                    localVideo.srcObject = screenStream;
+                    
+                    isScreenSharing = true;
+                    updateScreenUI(true);
+                    appendSystemMessage("Ekran paylaşımı başladı");
+                    
+                    // Paylaşım bittiğinde
+                    screenTrack.onended = () => {
+                        console.log("[SCREEN] Ekran paylaşımı kullanıcı tarafından durduruldu");
+                        stopScreenShare();
+                    };
+                    
+                } catch (err) {
+                    console.error("[SCREEN] Hata:", err);
+                    if (err.name !== "NotAllowedError") {
+                        appendSystemMessage("Ekran paylaşımı başlatılamadı");
+                    }
+                }
+            } else {
+                stopScreenShare();
+            }
+        });
+
+        function stopScreenShare() {
+            if (!isScreenSharing) return;
+            
+            console.log("[SCREEN] Ekran paylaşımı durduruluyor...");
+            
+            // Kamera track'ine geri dön
+            const cameraTrack = localStream?.getVideoTracks()[0];
+            
+            if (cameraTrack) {
+                peers.forEach((peerInfo, peerId) => {
+                    const sender = peerInfo.pc.getSenders().find(s => s.track && s.track.kind === "video");
+                    if (sender) {
+                        console.log(`[SCREEN] Kamera track'ine dönülüyor: ${peerId}`);
+                        sender.replaceTrack(cameraTrack);
+                    }
+                });
+            }
+            
+            // Screen stream'i kapat
+            if (screenStream) {
+                screenStream.getTracks().forEach(t => t.stop());
+                screenStream = null;
+            }
+            
+            // Local video'yu kameraya çevir
+            localVideo.srcObject = localStream;
+            
+            isScreenSharing = false;
+            updateScreenUI(false);
+            appendSystemMessage("Ekran paylaşımı durduruldu");
+        }
+
+        // Sohbet paneli toggle (mobil)
+        btnChatToggle.addEventListener("click", () => {
+            sidePanel.classList.toggle("hidden");
+            sidePanel.classList.toggle("flex");
+        });
+
+        // Oda kodunu kopyala
+        copyCodeBtn.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(roomCode);
+                copyCodeBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Kopyalandı';
+                setTimeout(() => {
+                    copyCodeBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Kopyala';
+                }, 2000);
+            } catch (e) {
+                console.error("Kopyalama hatası:", e);
+            }
+        });
+
+        // Toplantıdan ayrıl
+        leaveBtn.addEventListener("click", () => {
+            if (confirm("Toplantıdan ayrılmak istediğine emin misin?")) {
+                cleanup();
+                window.location.href = "index.html";
+            }
+        });
+
+        function cleanup() {
+            console.log("[CLEANUP] Temizlik yapılıyor...");
+            
+            if (socket) {
+                socket.close();
+            }
+            
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+            }
+            
+            if (screenStream) {
+                screenStream.getTracks().forEach(t => t.stop());
+            }
+            
+            peers.forEach((_, id) => removePeer(id));
+        }
+
+        // Sayfa kapatılırken temizlik
+        window.addEventListener("beforeunload", cleanup);
+
+        // ═══════════════════════════════════════════════════════════════
+        // BAŞLAT
+        // ═══════════════════════════════════════════════════════════════
+        
+        (async () => {
+            console.log("[INIT] Uygulama başlatılıyor...");
+            console.log("[INIT] Oda:", roomCode);
+            console.log("[INIT] Kullanıcı:", userName);
+            
+            // İlk olarak medya izni iste
+            mediaPermissionWarning.classList.remove("hidden");
+            
+            // Otomatik olarak izin istemeyi dene
+            const hasPermission = await requestMediaPermission();
+            
+            if (!hasPermission) {
+                console.log("[INIT] Medya izni bekleniyor...");
+                // Kullanıcı butona tıklayana kadar bekle
+            }
+        })();
+    </script>
+</body>
+</html>
