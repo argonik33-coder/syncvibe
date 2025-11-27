@@ -1,7 +1,12 @@
 {
   "name": "webber-io",
+<<<<<<< HEAD
   "version": "2.0.0",
   "description": "WebRTC Tabanlı Video Konferans Sistemi - Optimized",
+=======
+  "version": "1.0.0",
+  "description": "WebRTC Tabanlı Video Konferans Sistemi",
+>>>>>>> 93aa3a65154d3ac9854e6e5496c3130604ec9d61
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,8 +16,12 @@
     "webrtc",
     "video-conference",
     "socket-io",
+<<<<<<< HEAD
     "ai-bot",
     "gemini"
+=======
+    "ai-bot"
+>>>>>>> 93aa3a65154d3ac9854e6e5496c3130604ec9d61
   ],
   "author": "YavuzSOFT",
   "license": "MIT",
@@ -25,4 +34,8 @@
   "devDependencies": {
     "nodemon": "^3.0.1"
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 93aa3a65154d3ac9854e6e5496c3130604ec9d61
