@@ -3,7 +3,7 @@ const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const server = http.createServer(app);
@@ -14,7 +14,14 @@ const io = socketIO(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// API Key kontrolü - Başlangıçta uyarı göster
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.warn('⚠️  UYARI: GEMINI_API_KEY bulunamadı!');
+    console.warn('   Lütfen .env dosyası oluşturun ve GEMINI_API_KEY=your_key_here ekleyin.');
+    console.warn('   Gemini AI olmadan devam ediliyor...\n');
+}
+
 const rooms = new Map();
 
 app.get('/', (req, res) => {
@@ -31,14 +38,12 @@ app.post('/api/gemini', async (req, res) => {
     
     if (!GEMINI_API_KEY) {
         return res.status(500).json({
-            reply: '❌ GEMINI_API_KEY yapılandırılmamış.',
+            reply: '❌ GEMINI_API_KEY yapılandırılmamış. Lütfen .env dosyası oluşturun.',
             error: true
         });
     }
 
     try {
-        // DÜZELTİLEN KISIM: 'gemini-pro' ve 'v1beta' kullanılıyor.
-        // Bu kombinasyon en stabil olanıdır.
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
             {
@@ -51,19 +56,13 @@ app.post('/api/gemini', async (req, res) => {
             }
         );
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Google API Hatası Detayı:', errorText);
-            throw new Error(`API Hatası: ${response.status} - ${errorText}`);
-        }
-
         const data = await response.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yanıt alınamadı.';
         res.json({ reply });
     } catch (error) {
-        console.error('Gemini AI İşlem Hatası:', error.message);
+        console.error('Gemini AI Hatası:', error.message);
         res.status(500).json({ 
-            reply: '❌ AI şu anda yanıt veremiyor. (Model erişim hatası olabilir)',
+            reply: '❌ AI yanıtı alınamadı. API anahtarınızı kontrol edin.',
             error: true 
         });
     }
@@ -85,12 +84,11 @@ io.on('connection', (socket) => {
         }
 
         const room = rooms.get(roomId);
-        
         room.participants.set(socket.id, {
             id: socket.id,
             username,
             isAdmin: room.admin === socket.id,
-            isMuted: false,
+            isMuted: true, // Başlangıçta sessiz
             isVideoOff: false,
             isScreenSharing: false
         });
@@ -106,7 +104,7 @@ io.on('connection', (socket) => {
             });
         }, 1000);
 
-        // GİRİŞ LOGU - WEBBER AI
+        // GİRİŞ LOGU
         io.to(roomId).emit('new-message', {
             username: 'Webber AI',
             message: `${username} odaya katıldı`,
@@ -130,6 +128,7 @@ io.on('connection', (socket) => {
         console.log(`📥 ${username} katıldı (${roomId})`);
     });
 
+    // Diğer socket eventleri aynı kalıyor...
     socket.on('offer', ({ offer, to }) => {
         socket.to(to).emit('offer', { offer, from: socket.id });
     });
@@ -197,8 +196,7 @@ io.on('connection', (socket) => {
                     isSystemLog: false
                 });
 
-                // Dahili fetch
-                fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/gemini', {
+                fetch(`http://localhost:${process.env.PORT || 3000}/api/gemini`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ question })
@@ -214,10 +212,10 @@ io.on('connection', (socket) => {
                     });
                 })
                 .catch(err => {
-                    console.error('Gemini socket fetch hatası:', err);
+                    console.error('Gemini fetch hatası:', err);
                     io.to([...room.participants.keys()]).emit('new-message', {
                         username: 'Webber AI',
-                        message: '❌ AI yanıtı alınamadı.',
+                        message: '❌ AI yanıtı alınamadı. API anahtarınızı kontrol edin.',
                         timestamp: new Date().toISOString(),
                         isBot: true,
                         isSystemLog: false
@@ -225,28 +223,10 @@ io.on('connection', (socket) => {
                 });
             }
         }
-        else if (room.botActive) {
-            const msgLower = message.toLowerCase();
-            if (msgLower.includes('katılımcı')) {
-                setTimeout(() => {
-                    io.to([...room.participants.keys()]).emit('new-message', {
-                        username: 'Webber AI',
-                        message: `Toplam ${room.participants.size} katılımcı var 👥`,
-                        timestamp: new Date().toISOString(),
-                        isBot: true,
-                        isSystemLog: false
-                    });
-                }, 500 + Math.random() * 1000);
-            }
-        }
     });
 
     socket.on('leave-room', () => handleLeaveRoom(socket));
-    
-    socket.on('disconnect', () => {
-        console.log(`❌ Kullanıcı ayrıldı: ${socket.id}`);
-        handleLeaveRoom(socket);
-    });
+    socket.on('disconnect', () => handleLeaveRoom(socket));
 });
 
 function getRoomBySocket(socketId) {
@@ -290,5 +270,5 @@ function handleLeaveRoom(socket) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 Server çalışıyor: http://localhost:${PORT}`);
-    console.log(`🤖 Webber AI entegrasyonu aktif: ${GEMINI_API_KEY ? '✅' : '❌'}`);
+    console.log(`🤖 Gemini API: ${GEMINI_API_KEY ? '✅ Aktif' : '❌ Eksik (.env dosyası oluşturun)'}`);
 });
