@@ -1,402 +1,294 @@
-/**
- * VibeZone - WebRTC Signaling Server
- * by YavuzSOFT
- */
-
+const express = require('express');
 const http = require('http');
-const WebSocket = require('ws');
+const socketIO = require('socket.io');
 const path = require('path');
-const fs = require('fs');
 
-const PORT = process.env.PORT || 3000;
-const MAX_ROOM_SIZE = 12;
+require('dotenv').config();
 
-// ═══════════════════════════════════════════════════════════════
-// HTTP SUNUCUSU
-// ═══════════════════════════════════════════════════════════════
-
-const server = http.createServer((req, res) => {
-    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-    let pathname = parsedUrl.pathname;
-
-    // Güvenlik: path traversal saldırılarını önle
-    pathname = pathname.replace(/\.\./g, '');
-    
-    // Dosya yolunu belirle
-    let filePath = '.' + pathname;
-    if (filePath === './' || filePath === '.') {
-        filePath = './index.html';
-    }
-    
-    console.log(`[HTTP] İstek: ${req.url} → Dosya: ${filePath}`);
-    
-    const extname = path.extname(filePath).toLowerCase();
-    
-    const mimeTypes = {
-        '.html': 'text/html; charset=utf-8',
-        '.js': 'text/javascript; charset=utf-8',
-        '.css': 'text/css; charset=utf-8',
-        '.json': 'application/json; charset=utf-8',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.ico': 'image/x-icon',
-        '.webp': 'image/webp',
-        '.woff': 'font/woff',
-        '.woff2': 'font/woff2',
-        '.ttf': 'font/ttf',
-        '.mp3': 'audio/mpeg',
-        '.mp4': 'video/mp4',
-        '.webm': 'video/webm'
-    };
-
-    const contentType = mimeTypes[extname] || 'application/octet-stream';
-
-    fs.access(filePath, fs.constants.F_OK, (err) => {
-        if (err) {
-            console.log(`[HTTP] 404 - Dosya bulunamadı: ${filePath}`);
-            
-            fs.readdir('.', (err, files) => {
-                if (!err) {
-                    console.log(`[HTTP] Mevcut dosyalar: ${files.join(', ')}`);
-                }
-            });
-            
-            res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(`
-                <!DOCTYPE html>
-                <html>
-                <head><title>404 - Dosya Bulunamadı</title></head>
-                <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-                    <h1>404 - Dosya Bulunamadı</h1>
-                    <p>İstenen dosya: <code>${filePath}</code></p>
-                    <p><a href="/">Ana Sayfaya Dön</a></p>
-                </body>
-                </html>
-            `);
-            return;
-        }
-
-        fs.readFile(filePath, (error, content) => {
-            if (error) {
-                console.error(`[HTTP] Dosya okuma hatası: ${error.message}`);
-                res.writeHead(500);
-                res.end('Sunucu hatası: ' + error.code);
-            } else {
-                console.log(`[HTTP] 200 - Gönderiliyor: ${filePath}`);
-                res.writeHead(200, { 
-                    'Content-Type': contentType,
-                    'Access-Control-Allow-Origin': '*'
-                });
-                res.end(content, 'utf-8');
-            }
-        });
-    });
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server, {
+    cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-// ═══════════════════════════════════════════════════════════════
-// WEBSOCKET SUNUCUSU
-// ═══════════════════════════════════════════════════════════════
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-const wss = new WebSocket.Server({ server });
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const rooms = new Map();
 
-function generateClientId() {
-    return 'user_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
-}
-
-function broadcastToRoom(roomCode, message, excludeClientId = null) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    const messageStr = JSON.stringify(message);
-    room.clients.forEach((client, id) => {
-        if (id !== excludeClientId && client.ws.readyState === WebSocket.OPEN) {
-            try {
-                client.ws.send(messageStr);
-            } catch (err) {
-                console.error(`[HATA] Mesaj gönderilemedi:`, err.message);
-            }
-        }
-    });
-}
-
-function sendToClient(roomCode, clientId, message) {
-    const room = rooms.get(roomCode);
-    if (!room) return false;
-    const client = room.clients.get(clientId);
-    if (client && client.ws.readyState === WebSocket.OPEN) {
-        try {
-            client.ws.send(JSON.stringify(message));
-            return true;
-        } catch (err) {
-            console.error(`[HATA] Mesaj gönderilemedi:`, err.message);
-        }
-    }
-    return false;
-}
-
-function logRoomStats() {
-    console.log(`\n[İSTATİSTİK] Aktif oda sayısı: ${rooms.size}`);
-    rooms.forEach((room, code) => {
-        console.log(`  └─ Oda #${code}: ${room.clients.size} katılımcı`);
-    });
-}
-
-wss.on('connection', (ws, req) => {
-    let clientId = null;
-    let currentRoom = null;
-    let clientName = 'Misafir';
-
-    console.log(`[WS] Yeni bağlantı`);
-
-    ws.on('message', (data) => {
-        let msg;
-        try {
-            msg = JSON.parse(data.toString());
-        } catch (e) {
-            console.error('[HATA] Geçersiz JSON');
-            return;
-        }
-
-        switch (msg.type) {
-            case 'join':
-                handleJoin(msg);
-                break;
-            case 'signal':
-                handleSignal(msg);
-                break;
-            case 'chat':
-                handleChat(msg);
-                break;
-            case 'status':
-                handleStatus(msg);
-                break;
-            case 'reaction':
-                handleReaction(msg);
-                break;
-            case 'control':
-                handleControl(msg);
-                break;
-        }
-    });
-
-    function handleJoin(msg) {
-        const { room: roomCode, name } = msg;
-        
-        if (!roomCode) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Geçersiz oda kodu' }));
-            return;
-        }
-
-        // Oda yoksa oluştur
-        if (!rooms.has(roomCode)) {
-            rooms.set(roomCode, {
-                clients: new Map(),
-                locked: false,
-                hostId: null,
-                createdAt: new Date()
-            });
-            console.log(`[ODA] Yeni oda: #${roomCode}`);
-        }
-
-        const room = rooms.get(roomCode);
-
-        // Oda kilitliyse ve içinde en az 1 kişi varsa yeni girişi engelle
-        if (room.locked && room.clients.size > 0) {
-            ws.send(JSON.stringify({ type: 'locked' }));
-            return;
-        }
-
-        // Oda doluysa
-        if (room.clients.size >= MAX_ROOM_SIZE) {
-            ws.send(JSON.stringify({ type: 'full', max: MAX_ROOM_SIZE }));
-            return;
-        }
-
-        // Buraya geldiysek kullanıcıyı gerçekten odaya alacağız
-        clientId = generateClientId();
-        currentRoom = roomCode;
-        clientName = name || 'Misafir';
-
-        const isHost = room.clients.size === 0;
-        if (isHost) room.hostId = clientId;
-
-        room.clients.set(clientId, { ws, name: clientName, isHost });
-
-        const peers = [];
-        room.clients.forEach((client, id) => {
-            if (id !== clientId) {
-                peers.push({ id, name: client.name, isHost: id === room.hostId });
-            }
-        });
-
-        ws.send(JSON.stringify({
-            type: 'joined',
-            id: clientId,
-            hostId: room.hostId,
-            isHost,
-            locked: room.locked,
-            peers
-        }));
-
-        broadcastToRoom(roomCode, {
-            type: 'peer-joined',
-            id: clientId,
-            name: clientName,
-            isHost: clientId === room.hostId
-        }, clientId);
-
-        console.log(`[+] ${clientName} → #${roomCode} [${room.clients.size}/${MAX_ROOM_SIZE}]`);
-        logRoomStats();
-    }
-
-    function handleSignal(msg) {
-        const { room: roomCode, to, data } = msg;
-        if (!roomCode || !to || !data) return;
-        sendToClient(roomCode, to, { type: 'signal', from: clientId, data });
-    }
-
-    function handleChat(msg) {
-        const { room: roomCode, text } = msg;
-        if (!roomCode || !text) return;
-        const room = rooms.get(roomCode);
-        if (!room) return;
-        const client = room.clients.get(clientId);
-        if (!client) return;
-        const cleanText = text.trim().substring(0, 1000);
-        if (!cleanText) return;
-        broadcastToRoom(roomCode, {
-            type: 'chat',
-            senderId: clientId,
-            from: client.name,
-            text: cleanText
-        });
-    }
-
-    function handleStatus(msg) {
-        const { room: roomCode, action, value } = msg;
-        if (!roomCode || !action) return;
-        broadcastToRoom(roomCode, { type: 'status', id: clientId, action, value });
-    }
-
-    function handleReaction(msg) {
-        const { room: roomCode, emoji } = msg;
-        if (!roomCode || !emoji) return;
-        const allowedEmojis = ['👍', '❤️', '👏', '😂', '😮', '🎉', '🔥', '👀'];
-        if (!allowedEmojis.includes(emoji)) return;
-        broadcastToRoom(roomCode, { type: 'reaction', id: clientId, emoji });
-    }
-
-    function handleControl(msg) {
-        const { room: roomCode, action, value, targetId } = msg;
-        if (!roomCode || !action) return;
-        const room = rooms.get(roomCode);
-        if (!room || clientId !== room.hostId) return;
-
-        switch (action) {
-            case 'lock-room':
-                room.locked = !!value;
-                broadcastToRoom(roomCode, { type: 'room-lock', locked: room.locked });
-                break;
-            case 'mute-mic':
-                if (targetId && targetId !== clientId) {
-                    sendToClient(roomCode, targetId, { type: 'control', action: 'mute-mic' });
-                }
-                break;
-            case 'kick':
-                if (targetId && targetId !== clientId) {
-                    sendToClient(roomCode, targetId, { type: 'control', action: 'kick' });
-                }
-                break;
-        }
-    }
-
-    ws.on('close', () => {
-        if (!currentRoom || !clientId) return;
-        const room = rooms.get(currentRoom);
-        if (!room) return;
-
-        const wasHost = clientId === room.hostId;
-        const client = room.clients.get(clientId);
-        const name = client ? client.name : clientName;
-
-        room.clients.delete(clientId);
-        broadcastToRoom(currentRoom, { type: 'peer-left', id: clientId, name });
-        console.log(`[-] ${name} ← #${currentRoom}`);
-
-        if (room.clients.size === 0) {
-            rooms.delete(currentRoom);
-        } else if (wasHost) {
-            room.hostId = room.clients.keys().next().value;
-            const newHost = room.clients.get(room.hostId);
-            if (newHost) newHost.isHost = true;
-            broadcastToRoom(currentRoom, { type: 'host-changed', hostId: room.hostId });
-        }
-        logRoomStats();
-    });
-
-    ws.on('error', (error) => {
-        console.error(`[HATA] WebSocket:`, error.message);
-    });
-
-    ws.isAlive = true;
-    ws.on('pong', () => { ws.isAlive = true; });
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Heartbeat
-setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 30000);
+app.get('/:roomId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'room.html'));
+});
 
-// ═══════════════════════════════════════════════════════════════
-// BAŞLAT
-// ═══════════════════════════════════════════════════════════════
-
-server.listen(PORT, () => {
-    console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║                     VibeZone Sunucusu                         ║
-╠═══════════════════════════════════════════════════════════════╣
-║   🚀 http://localhost:${PORT}                                    ║
-║                                                               ║
-║   Mevcut dosyalar kontrol ediliyor...                         ║
-╚═══════════════════════════════════════════════════════════════╝
-    `);
+// API ENDPOINT - /api/gemini
+app.post('/api/gemini', async (req, res) => {
+    const { question } = req.body;
     
-    fs.readdir('.', (err, files) => {
-        if (err) {
-            console.error('[HATA] Dosyalar okunamadı:', err.message);
-        } else {
-            console.log('\n[DOSYALAR] Mevcut dosyalar:');
-            files.forEach(file => {
-                const isHtml = file.endsWith('.html');
-                const isJs = file.endsWith('.js');
-                const icon = isHtml ? '📄' : (isJs ? '⚙️' : '📁');
-                console.log(`  ${icon} ${file}`);
+    if (!GEMINI_API_KEY) {
+        return res.status(500).json({
+            reply: '❌ GEMINI_API_KEY yapılandırılmamış.',
+            error: true
+        });
+    }
+
+    try {
+        // DÜZELTİLEN KISIM: 'gemini-pro' ve 'v1beta' kullanılıyor.
+        // Bu kombinasyon en stabil olanıdır.
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: question }] }],
+                    generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Google API Hatası Detayı:', errorText);
+            throw new Error(`API Hatası: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yanıt alınamadı.';
+        res.json({ reply });
+    } catch (error) {
+        console.error('Gemini AI İşlem Hatası:', error.message);
+        res.status(500).json({ 
+            reply: '❌ AI şu anda yanıt veremiyor. (Model erişim hatası olabilir)',
+            error: true 
+        });
+    }
+});
+
+// Socket.IO
+io.on('connection', (socket) => {
+    console.log(`✅ Kullanıcı bağlandı: ${socket.id}`);
+
+    socket.on('join-room', ({ roomId, username }) => {
+        socket.join(roomId);
+        
+        if (!rooms.has(roomId)) {
+            rooms.set(roomId, {
+                participants: new Map(),
+                admin: socket.id,
+                botActive: true
             });
+        }
+
+        const room = rooms.get(roomId);
+        
+        room.participants.set(socket.id, {
+            id: socket.id,
+            username,
+            isAdmin: room.admin === socket.id,
+            isMuted: false,
+            isVideoOff: false,
+            isScreenSharing: false
+        });
+
+        // WEBBER AI KARŞILAMA
+        setTimeout(() => {
+            socket.emit('new-message', {
+                username: 'Webber AI',
+                message: `Merhaba ${username}! Benimle konuşmak isterseniz "/webber [soru]" şeklinde soru sorabilirsiniz. İyi eğlenceler... ♥`,
+                timestamp: new Date().toISOString(),
+                isBot: true,
+                isSystemLog: false
+            });
+        }, 1000);
+
+        // GİRİŞ LOGU - WEBBER AI
+        io.to(roomId).emit('new-message', {
+            username: 'Webber AI',
+            message: `${username} odaya katıldı`,
+            timestamp: new Date().toISOString(),
+            isBot: true,
+            isSystemLog: true
+        });
+
+        socket.to(roomId).emit('user-joined', {
+            id: socket.id,
+            username,
+            isAdmin: room.admin === socket.id
+        });
+
+        socket.emit('room-data', {
+            participants: Array.from(room.participants.values()),
+            admin: room.admin,
+            roomId
+        });
+
+        console.log(`📥 ${username} katıldı (${roomId})`);
+    });
+
+    socket.on('offer', ({ offer, to }) => {
+        socket.to(to).emit('offer', { offer, from: socket.id });
+    });
+
+    socket.on('answer', ({ answer, to }) => {
+        socket.to(to).emit('answer', { answer, from: socket.id });
+    });
+
+    socket.on('ice-candidate', ({ candidate, to }) => {
+        socket.to(to).emit('ice-candidate', { candidate, from: socket.id });
+    });
+
+    socket.on('media-state-change', ({ isMuted, isVideoOff }) => {
+        const room = getRoomBySocket(socket.id);
+        if (room) {
+            const participant = room.participants.get(socket.id);
+            if (participant) {
+                participant.isMuted = isMuted;
+                participant.isVideoOff = isVideoOff;
+            }
+            socket.to([...room.participants.keys()]).emit('user-media-state', {
+                userId: socket.id,
+                isMuted,
+                isVideoOff
+            });
+        }
+    });
+
+    socket.on('screen-share-state', (isSharing) => {
+        const room = getRoomBySocket(socket.id);
+        if (room) {
+            const participant = room.participants.get(socket.id);
+            if (participant) participant.isScreenSharing = isSharing;
+            socket.to([...room.participants.keys()]).emit('user-screen-share', {
+                userId: socket.id,
+                isSharing
+            });
+        }
+    });
+
+    socket.on('send-message', (message) => {
+        const room = getRoomBySocket(socket.id);
+        if (!room) return;
+
+        const participant = room.participants.get(socket.id);
+        
+        io.to([...room.participants.keys()]).emit('new-message', {
+            username: participant.username,
+            message,
+            timestamp: new Date().toISOString(),
+            isBot: false,
+            isSystemLog: false
+        });
+
+        // WEBBER AI KOMUTU
+        if (message.trim().startsWith('/webber ')) {
+            const question = message.substring(8).trim();
             
-            const required = ['index.html', 'room.html'];
-            const missing = required.filter(f => !files.includes(f));
-            
-            if (missing.length > 0) {
-                console.log('\n⚠️  EKSİK DOSYALAR:');
-                missing.forEach(f => console.log(`  ❌ ${f}`));
-                console.log('\nBu dosyaları oluşturmanız gerekiyor!');
-            } else {
-                console.log('\n✅ Tüm gerekli dosyalar mevcut!');
+            if (question) {
+                io.to(socket.id).emit('new-message', {
+                    username: 'Webber AI',
+                    message: '... yanıt hazırlanıyor',
+                    timestamp: new Date().toISOString(),
+                    isBot: true,
+                    isSystemLog: false
+                });
+
+                // Dahili fetch
+                fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    io.to([...room.participants.keys()]).emit('new-message', {
+                        username: 'Webber AI',
+                        message: data.reply,
+                        timestamp: new Date().toISOString(),
+                        isBot: true,
+                        isSystemLog: false
+                    });
+                })
+                .catch(err => {
+                    console.error('Gemini socket fetch hatası:', err);
+                    io.to([...room.participants.keys()]).emit('new-message', {
+                        username: 'Webber AI',
+                        message: '❌ AI yanıtı alınamadı.',
+                        timestamp: new Date().toISOString(),
+                        isBot: true,
+                        isSystemLog: false
+                    });
+                });
+            }
+        }
+        else if (room.botActive) {
+            const msgLower = message.toLowerCase();
+            if (msgLower.includes('katılımcı')) {
+                setTimeout(() => {
+                    io.to([...room.participants.keys()]).emit('new-message', {
+                        username: 'Webber AI',
+                        message: `Toplam ${room.participants.size} katılımcı var 👥`,
+                        timestamp: new Date().toISOString(),
+                        isBot: true,
+                        isSystemLog: false
+                    });
+                }, 500 + Math.random() * 1000);
             }
         }
     });
+
+    socket.on('leave-room', () => handleLeaveRoom(socket));
+    
+    socket.on('disconnect', () => {
+        console.log(`❌ Kullanıcı ayrıldı: ${socket.id}`);
+        handleLeaveRoom(socket);
+    });
 });
 
-process.on('SIGINT', () => {
-    console.log('\n[KAPATILIYOR]...');
-    wss.clients.forEach((ws) => ws.close());
-    server.close(() => process.exit(0));
+function getRoomBySocket(socketId) {
+    for (const room of rooms.values()) {
+        if (room.participants.has(socketId)) return room;
+    }
+    return null;
+}
+
+function handleLeaveRoom(socket) {
+    rooms.forEach((room, roomId) => {
+        if (room.participants.has(socket.id)) {
+            const participant = room.participants.get(socket.id);
+            room.participants.delete(socket.id);
+            
+            io.to(roomId).emit('new-message', {
+                username: 'Webber AI',
+                message: `${participant.username} odadan ayrıldı`,
+                timestamp: new Date().toISOString(),
+                isBot: true,
+                isSystemLog: true
+            });
+
+            if (room.admin === socket.id && room.participants.size > 0) {
+                const newAdmin = room.participants.values().next().value;
+                room.admin = newAdmin.id;
+                io.to(newAdmin.id).emit('admin-assigned', true);
+            }
+
+            io.to(roomId).emit('user-left', socket.id);
+            socket.leave(roomId);
+
+            if (room.participants.size === 0) {
+                rooms.delete(roomId);
+                console.log(`🗑️ Boş oda silindi: ${roomId}`);
+            }
+        }
+    });
+}
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 Server çalışıyor: http://localhost:${PORT}`);
+    console.log(`🤖 Webber AI entegrasyonu aktif: ${GEMINI_API_KEY ? '✅' : '❌'}`);
 });
