@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>webber.io</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .permission-prompt {
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-black dark:bg-black dark:text-white transition-colors duration-500 min-h-screen flex flex-col">
+
+    <!-- HEADER -->
+    <header class="flex justify-between items-center p-8 absolute top-0 w-full z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm">
+        <div class="text-2xl font-black tracking-tighter border-2 border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-sm">
+            WEBBER.IO
+        </div>
+        <button id="theme-toggle" class="text-sm font-medium uppercase tracking-widest hover:underline opacity-70 hover:opacity-100 transition">
+            <span class="dark:hidden">Dark Mode</span>
+            <span class="hidden dark:inline">Light Mode</span>
+        </button>
+    </header>
+
+    <!-- MAIN -->
+    <main class="flex-grow flex flex-col items-center justify-center px-4">
+        
+        <!-- İzin İsteme Modalı -->
+        <div id="permission-modal" class="permission-prompt fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-gray-200 dark:border-gray-800">
+                <div class="text-center mb-6">
+                    <i class="fas fa-shield-alt text-4xl text-blue-500 mb-4"></i>
+                    <h2 class="text-2xl font-bold mb-2">İzinler Gerekli</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Bağlanmadan önce kamera ve mikrofon izni vermeniz gerekiyor.</p>
+                </div>
+                <button id="request-permissions" class="w-full bg-black text-white dark:bg-white dark:text-black py-3 rounded-lg font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition">
+                    İzinleri Ver & Başla
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full max-w-xl space-y-8">
+            
+            <div class="space-y-2 text-center">
+                <h1 class="text-6xl md:text-7xl font-black tracking-tighter leading-none">
+                    BASİT<br>
+                    <span class="text-gray-500">GÜVENLİ</span><br>
+                    <span class="opacity-70">ANLIK</span>
+                </h1>
+                <p class="text-gray-500 dark:text-gray-400 text-lg font-light mt-4">
+                    YavuzSOFT tarafından geliştirilen minimalist video konferans.
+                </p>
+            </div>
+
+            <!-- Form -->
+            <div class="space-y-4">
+                <div class="relative">
+                    <input type="text" id="username-input" placeholder="Kullanıcı adı girin..." 
+                        class="w-full bg-transparent border-b-2 border-gray-300 dark:border-gray-700 py-4 text-xl font-light focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder-gray-300 dark:placeholder-gray-800 text-center"
+                        onkeydown="checkEnter(event, 'username')">
+                </div>
+                
+                <div class="relative">
+                    <input type="text" id="room-name-input" placeholder="Oda ismi girin..." 
+                        class="w-full bg-transparent border-b-2 border-gray-300 dark:border-gray-700 py-4 text-2xl font-light focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder-gray-300 dark:placeholder-gray-800 text-center"
+                        onkeydown="checkEnter(event, 'room')">
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4 pt-4">
+                    <button onclick="joinRoom()" 
+                        class="flex-1 bg-black text-white dark:bg-white dark:text-black py-4 text-lg font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition duration-300 rounded-lg">
+                        ODA BAŞLAT
+                    </button>
+                    
+                    <button onclick="createRandomRoom()" 
+                        class="px-6 py-4 text-gray-500 hover:text-black dark:hover:text-white text-sm font-medium transition border border-gray-300 dark:border-gray-700 hover:border-black dark:hover:border-white rounded-lg">
+                        <i class="fas fa-random mr-2"></i>Rastgele Oda
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="absolute bottom-6 w-full text-center text-xs text-gray-500 dark:text-gray-700 uppercase tracking-widest">
+        &copy; 2026 YavuzSOFT
+    </footer>
+
+    <script>
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            localStorage.setItem('theme', htmlElement.classList.contains('dark') ? 'dark' : 'light');
+        });
+
+        // İzinleri iste ve gizle
+        document.getElementById('request-permissions').addEventListener('click', async () => {
+            try {
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                document.getElementById('permission-modal').style.display = 'none';
+            } catch (err) {
+                alert('Kamera izni reddedildi. Devam edebilirsiniz ama video görüntünüz olmayacak.');
+                document.getElementById('permission-modal').style.display = 'none';
+            }
+        });
+
+        function generateRandomUsername() {
+            return `Misafir${Math.floor(100 + Math.random() * 900)}`;
+        }
+
+        function joinRoom() {
+            const username = document.getElementById('username-input').value.trim() || generateRandomUsername();
+            const roomName = document.getElementById('room-name-input').value.trim().replace(/\s+/g, '-').toLowerCase();
+            
+            localStorage.setItem('username', username);
+            localStorage.setItem('isAdmin', 'true'); // Oluşturan kişi admin
+            
+            if (roomName) {
+                window.location.href = `/${roomName}`;
+            } else {
+                createRandomRoom();
+            }
+        }
+
+        function createRandomRoom() {
+            const username = document.getElementById('username-input').value.trim() || generateRandomUsername();
+            localStorage.setItem('username', username);
+            localStorage.setItem('isAdmin', 'true');
+            
+            const randomRoom = `oda-${Math.random().toString(36).substring(2, 9)}`;
+            window.location.href = `/${randomRoom}`;
+        }
+
+        function checkEnter(event, field) {
+            if (event.key === "Enter") {
+                if (field === 'username') {
+                    document.getElementById('room-name-input').focus();
+                } else {
+                    joinRoom();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
