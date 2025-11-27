@@ -14,7 +14,7 @@
     <style>
         html, body {
             height: 100%;
-            overflow: hidden; /* Sayfa genelinde kaydırma yok */
+            overflow: hidden; /* Sayfa genelinde kaydırma YOK */
         }
 
         body {
@@ -64,13 +64,11 @@
         }
         /* Daha küçük spotlight */
         @media (min-width: 640px) {
-            /* sm: 2 kolon → spotlight 2 kolon */
             .tile-spotlight {
                 grid-column: 1 / span 2;
             }
         }
         @media (min-width: 1024px) {
-            /* lg: 3 kolon → spotlight 2 kolon */
             .tile-spotlight {
                 grid-column: 1 / span 2;
             }
@@ -149,8 +147,8 @@
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex overflow-hidden">
+    <!-- Main Content (orta alan sabit yükseklikte, kendi içinde scroll) -->
+    <main class="flex-1 flex overflow-hidden min-h-0 pb-14 sm:pb-16">
         <!-- Video Grid -->
         <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden min-h-0">
             <div id="videoGrid"
@@ -223,7 +221,7 @@
                     <h3 class="text-sm font-semibold">Sohbet</h3>
                 </div>
                 
-                <!-- Chat mesajları - SABİT YÜKSEKLİK -->
+                <!-- Chat mesajları -->
                 <div id="chatMessages"
                      class="flex-1 px-4 py-2 space-y-2 text-sm overflow-y-auto">
                     <div class="text-center text-[11px] text-slate-500 py-2">
@@ -246,8 +244,8 @@
         </aside>
     </main>
 
-    <!-- Bottom Controls (ekrana sabit) -->
-    <footer class="flex-shrink-0 border-t border-slate-800 bg-slate-950/95">
+    <!-- Bottom Controls: EKRANA SABİT -->
+    <footer class="fixed inset-x-0 bottom-0 border-t border-slate-800 bg-slate-950/95 z-30">
         <div class="max-w-5xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-3">
             <button id="btnMic"
                     class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
@@ -347,7 +345,6 @@
         const reactionButtons = document.querySelectorAll(".reaction-btn");
         const btnSideClose = document.getElementById("btnSideClose");
 
-        // DURUM
         const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         let localStream = null;
         let screenStream = null;
@@ -367,8 +364,8 @@
         let currentScreenSharerId = null;
         let handRaised = false;
 
-        const peers = new Map();
-        const participants = new Map();
+        const peers = new Map();        // peerId -> { pc, stream, videoEl, tileEl, name, videoSender }
+        const participants = new Map(); // clientId -> { name, isSelf, isHost, handRaised }
 
         const signalingServerUrl =
             (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
@@ -461,7 +458,7 @@
                 requestAnimationFrame(loop);
             }
 
-        requestAnimationFrame(loop);
+            requestAnimationFrame(loop);
         }
 
         function stopSpeakingMonitor(id) {
@@ -1011,7 +1008,6 @@
             };
             peers.set(peerId, peerInfo);
 
-            // Ekran sesi paylaşılıyorsa yankıyı azaltmak için bu videoyu sessize al
             if (isScreenSharingWithAudio) {
                 videoEl.muted = true;
                 videoEl.dataset.mutedByScreenShare = "1";
@@ -1138,7 +1134,6 @@
                             await startCallToPeer(peer.id, peer.name);
                         }
 
-                        // İlk kamera durumu
                         sendStatus(
                             "camera",
                             camEnabled &&
