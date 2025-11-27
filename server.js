@@ -7,7 +7,6 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-// const url = require('url'); // ARTIK GEREKMİYOR
 
 const PORT = process.env.PORT || 3000;
 const MAX_ROOM_SIZE = 12;
@@ -17,7 +16,6 @@ const MAX_ROOM_SIZE = 12;
 // ═══════════════════════════════════════════════════════════════
 
 const server = http.createServer((req, res) => {
-    // WHATWG URL API kullanımı
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
 
@@ -192,10 +190,7 @@ wss.on('connection', (ws, req) => {
             return;
         }
 
-        clientId = generateClientId();
-        currentRoom = roomCode;
-        clientName = name || 'Misafir';
-
+        // Oda yoksa oluştur
         if (!rooms.has(roomCode)) {
             rooms.set(roomCode, {
                 clients: new Map(),
@@ -208,15 +203,22 @@ wss.on('connection', (ws, req) => {
 
         const room = rooms.get(roomCode);
 
+        // Oda kilitliyse ve içinde en az 1 kişi varsa yeni girişi engelle
         if (room.locked && room.clients.size > 0) {
             ws.send(JSON.stringify({ type: 'locked' }));
             return;
         }
 
+        // Oda doluysa
         if (room.clients.size >= MAX_ROOM_SIZE) {
             ws.send(JSON.stringify({ type: 'full', max: MAX_ROOM_SIZE }));
             return;
         }
+
+        // Buraya geldiysek kullanıcıyı gerçekten odaya alacağız
+        clientId = generateClientId();
+        currentRoom = roomCode;
+        clientName = name || 'Misafir';
 
         const isHost = room.clients.size === 0;
         if (isHost) room.hostId = clientId;
@@ -279,7 +281,7 @@ wss.on('connection', (ws, req) => {
         broadcastToRoom(roomCode, { type: 'status', id: clientId, action, value });
     }
 
-        function handleReaction(msg) {
+    function handleReaction(msg) {
         const { room: roomCode, emoji } = msg;
         if (!roomCode || !emoji) return;
         const allowedEmojis = ['👍', '❤️', '👏', '😂', '😮', '🎉', '🔥', '👀'];
