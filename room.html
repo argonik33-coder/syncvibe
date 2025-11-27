@@ -363,6 +363,7 @@
         let micEnabled = true;
         let camEnabled = true;
         let hasCamera = true;
+        let micTracks = []; // sadece mikrofona ait audio track'ler
         let socket = null;
         let clientId = null;
         let mediaReady = false;
@@ -663,6 +664,10 @@
             
             localVideo.srcObject = localStream;
             mediaReady = true;
+
+            // Mikrofon track'lerini kaydet (ekran sesinden bağımsız)
+            micTracks = localStream.getAudioTracks() || [];
+            console.log("[MEDYA] Mikrofon track sayısı:", micTracks.length);
 
             monitorStreamAudio("local", localStream, localTile);
             startSpeakingDetectionLoop();
@@ -985,12 +990,35 @@
             tile.appendChild(camOffOverlay);
             tile.appendChild(fsBtn);
 
+            // Mobil için: dokunarak video başlat overlay'i
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                navigator.userAgent
+            );
+
+            if (isMobile) {
+                const tapOverlay = document.createElement("div");
+                tapOverlay.className =
+                    "absolute inset-0 z-10 flex items-center justify-center bg-black/40 text-xs text-slate-100";
+                tapOverlay.textContent = "Videoyu başlatmak için dokun";
+                tile.appendChild(tapOverlay);
+
+                const startPlayback = () => {
+                    video
+                        .play()
+                        .catch((err) => console.warn("Mobil video play hatası:", err));
+                    tapOverlay.classList.add("hidden");
+                    tile.removeEventListener("click", startPlayback);
+                };
+
+                tile.addEventListener("click", startPlayback);
+            }
+
             videoGrid.appendChild(tile);
 
             return { videoEl: video, tileEl: tile };
         }
 
-        // RENEGOTIATION: ekran sesini eklerken kullanacağız
+        // RENEGOTIATION: ekran sesini/video değişimini duyurmak için
         async function renegotiateWithPeer(peerId) {
             const peerInfo = peers.get(peerId);
             if (!peerInfo) return;
@@ -1014,7 +1042,8 @@
             console.log(`[PEER] Yeni bağlantı oluşturuluyor: ${peerName}`);
             const pc = new RTCPeerConnection(iceConfig);
 
-            localStream.getAudioTracks().forEach((track) => {
+            // Sadece mikrofona ait track'leri ekle
+            (micTracks || []).forEach((track) => {
                 pc.addTrack(track, localStream);
             });
 
@@ -1253,10 +1282,8 @@
 
                     case "control":
                         if (msg.action === "mute-mic") {
-                            if (localStream) {
-                                localStream
-                                    .getAudioTracks()
-                                    .forEach((t) => (t.enabled = false));
+                            if (micTracks && micTracks.length > 0) {
+                                micTracks.forEach((t) => (t.enabled = false));
                             }
                             micEnabled = false;
                             updateMicUI();
@@ -1436,9 +1463,10 @@
         }
 
         btnMic.addEventListener("click", () => {
-            if (!localStream) return;
+            // Sadece mikrofona ait track'leri etkilesin, ekran sesi aynen gitsin
+            if (!micTracks || micTracks.length === 0) return;
             micEnabled = !micEnabled;
-            localStream.getAudioTracks().forEach((t) => (t.enabled = micEnabled));
+            micTracks.forEach((t) => (t.enabled = micEnabled));
             updateMicUI();
         });
 
@@ -1510,11 +1538,13 @@
                         if (sender) {
                             sender.replaceTrack(screenVideoTrack);
                         }
+
                         if (isScreenSharingWithAudio && screenAudioTrack) {
                             peerInfo.pc.addTrack(screenAudioTrack, screenStream);
-                            // Yeni audio track'i karşıya duyur
-                            renegotiateWithPeer(peerId);
                         }
+
+                        // Hem video hem (varsa) ses değişti, her durumda renegotiation yap
+                        renegotiateWithPeer(peerId);
                     });
 
                     if (isScreenSharingWithAudio) {
@@ -1565,11 +1595,13 @@
             const cameraTrack =
                 localStream?.getVideoTracks()[0] || null;
 
-            peers.forEach((peerInfo) => {
+            peers.forEach((peerInfo, peerId) => {
                 const sender = peerInfo.videoSender;
                 if (sender) {
                     sender.replaceTrack(cameraTrack);
                 }
+                // Video tekrar kameraya döndü, yeniden negotiate et
+                renegotiateWithPeer(peerId);
             });
 
             if (screenStream) {
@@ -1658,6 +1690,7 @@
             if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
             peers.forEach((_, id) => removePeer(id));
             stopSpeakingMonitor("local");
+            micTracks = [];
         }
 
         window.addEventListener("beforeunload", cleanup);
