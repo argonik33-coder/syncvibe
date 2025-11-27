@@ -163,6 +163,13 @@
                      class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
                     <video id="localVideo" autoplay playsinline muted
                            class="mirror w-full h-full object-cover bg-black"></video>
+
+                    <!-- Fullscreen butonu -->
+                    <button id="localFsBtn"
+                            class="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-xs flex items-center justify-center">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+
                     <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1">
                         <span id="localStatusDot" class="h-2 w-2 rounded-full bg-yellow-400"></span>
                         <span>Sen</span>
@@ -305,7 +312,12 @@
         // URL PARAMETRELERİ
         const params = new URLSearchParams(window.location.search);
         let roomCode = params.get("room");
-        let userName = params.get("name") || "Misafir" + Math.floor(100 + Math.random() * 900);
+
+        // Kullanıcı adı URL'den değil, sessionStorage'dan geliyor
+        let userName =
+            (typeof sessionStorage !== "undefined" && sessionStorage.getItem("vibezone_username")) ||
+            "Misafir" + Math.floor(100 + Math.random() * 900);
+
         if (!roomCode || !/^\d{6}$/.test(roomCode)) {
             window.location.href = "index.html";
         }
@@ -319,6 +331,7 @@
         const localStatusDot = document.getElementById("localStatusDot");
         const localMicIcon = document.getElementById("localMicIcon");
         const localTile = document.getElementById("localTile");
+        const localFsBtn = document.getElementById("localFsBtn");
         const videoGrid = document.getElementById("videoGrid");
         const sidePanel = document.getElementById("sidePanel");
         const participantsList = document.getElementById("participantsList");
@@ -463,6 +476,20 @@
             speakingMonitors.delete(id);
         }
 
+        // Fullscreen yardımcı fonksiyonu
+        function toggleFullscreenForElement(el) {
+            if (!el) return;
+            if (!document.fullscreenElement) {
+                (el.requestFullscreen && el.requestFullscreen().catch?.((err) => {
+                    console.warn("Fullscreen açılırken hata:", err);
+                }));
+            } else {
+                (document.exitFullscreen && document.exitFullscreen().catch?.((err) => {
+                    console.warn("Fullscreen kapatılırken hata:", err);
+                }));
+            }
+        }
+
         function showSelfScreenTile() {
             if (!screenStream) return;
             if (!selfScreenTileEl) {
@@ -474,6 +501,7 @@
                 const video = document.createElement("video");
                 video.autoplay = true;
                 video.playsInline = true;
+                video.setAttribute("playsinline", "playsinline");
                 video.muted = true;
                 video.className = "w-full h-full object-cover bg-black";
                 video.srcObject = screenStream;
@@ -490,9 +518,20 @@
                 labelBottom.innerHTML =
                     `<i class="fa-solid fa-display text-sky-400"></i><span>Ekran Paylaşımı</span>`;
 
+                // Fullscreen butonu
+                const fsBtn = document.createElement("button");
+                fsBtn.className =
+                    "absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-xs flex items-center justify-center";
+                fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+                fsBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    toggleFullscreenForElement(tile);
+                });
+
                 tile.appendChild(video);
                 tile.appendChild(labelTop);
                 tile.appendChild(labelBottom);
+                tile.appendChild(fsBtn);
 
                 videoGrid.appendChild(tile);
 
@@ -904,6 +943,7 @@
             const video = document.createElement("video");
             video.autoplay = true;
             video.playsInline = true;
+            video.setAttribute("playsinline", "playsinline");
             video.className = "mirror w-full h-full object-cover bg-black";
             video.muted = false;
 
@@ -929,13 +969,39 @@
                 </div>
             `;
 
+            // Fullscreen butonu
+            const fsBtn = document.createElement("button");
+            fsBtn.className =
+                "absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-xs flex items-center justify-center";
+            fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+            fsBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleFullscreenForElement(tile);
+            });
+
             tile.appendChild(video);
             tile.appendChild(labelTop);
             tile.appendChild(labelBottom);
             tile.appendChild(camOffOverlay);
+            tile.appendChild(fsBtn);
+
             videoGrid.appendChild(tile);
 
             return { videoEl: video, tileEl: tile };
+        }
+
+        // RENEGOTIATION: ekran sesini eklerken kullanacağız
+        async function renegotiateWithPeer(peerId) {
+            const peerInfo = peers.get(peerId);
+            if (!peerInfo) return;
+            const pc = peerInfo.pc;
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal(peerId, { type: "offer", sdp: offer });
+            } catch (err) {
+                console.error("[RENEGOTIATE] Hata:", err);
+            }
         }
 
         async function getOrCreatePeerConnection(peerId, peerName) {
@@ -1000,8 +1066,19 @@
                 if (!peerInfo.stream) {
                     peerInfo.stream = new MediaStream();
                     peerInfo.videoEl.srcObject = peerInfo.stream;
+                    // Mobilde autoplay için dene
+                    peerInfo.videoEl.play().catch((err) => {
+                        console.warn("Remote video play engellendi:", err);
+                    });
                 }
+
                 peerInfo.stream.addTrack(event.track);
+
+                if (event.track.kind === "video") {
+                    peerInfo.videoEl.play().catch((err) => {
+                        console.warn("Remote video play (video track) engellendi:", err);
+                    });
+                }
 
                 if (event.track.kind === "audio") {
                     monitorStreamAudio(peerId, peerInfo.stream, tileEl);
@@ -1428,16 +1505,15 @@
 
                     showSelfScreenTile();
 
-                    peers.forEach((peerInfo) => {
+                    peers.forEach((peerInfo, peerId) => {
                         const sender = peerInfo.videoSender;
                         if (sender) {
                             sender.replaceTrack(screenVideoTrack);
                         }
                         if (isScreenSharingWithAudio && screenAudioTrack) {
-                            peerInfo.pc.addTrack(
-                                screenAudioTrack,
-                                screenStream
-                            );
+                            peerInfo.pc.addTrack(screenAudioTrack, screenStream);
+                            // Yeni audio track'i karşıya duyur
+                            renegotiateWithPeer(peerId);
                         }
                     });
 
@@ -1567,6 +1643,14 @@
                 window.location.href = "index.html";
             }
         });
+
+        // Local fullscreen butonu
+        if (localFsBtn) {
+            localFsBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleFullscreenForElement(localTile);
+            });
+        }
 
         function cleanup() {
             if (socket) socket.close();
