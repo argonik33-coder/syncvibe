@@ -23,7 +23,6 @@
         body { font-family: 'Inter', sans-serif; }
         .video-grid { display: grid; gap: 1rem; transition: all 0.3s ease; }
         
-        /* LIGHT MODE - Eski tasarım */
         .video-container { 
             position: relative; 
             background: #f3f4f6; 
@@ -31,7 +30,6 @@
             overflow: hidden; 
         }
         
-        /* DARK MODE - Mevcut siyah tema */
         .dark .video-container { 
             background: #000000; 
         }
@@ -53,7 +51,6 @@
         #chat-messages::-webkit-scrollbar-thumb, #participants-list::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 3px; }
         html, body { height: 100%; overflow: hidden; }
         
-        /* LIGHT MODE mesajları - WEBBER AI SİYAH */
         .message-bot { 
             background: #000000; 
             color: #e5e7eb; 
@@ -65,7 +62,6 @@
             font-style: italic; 
         }
         
-        /* DARK MODE mesajları */
         .dark .message-bot { 
             background: #000000; 
             color: #e5e7eb; 
@@ -185,7 +181,7 @@
         </div>
     </main>
 
-    <!-- Controls - CHAT BUTONU KALDIRILDI -->
+    <!-- Controls - MOBILE CHAT TOGGLE EKLENDİ -->
     <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 bg-white/90 dark:bg-black/90 backdrop-blur-sm p-4 rounded-full flex items-center gap-4 shadow-lg">
         <!-- Mute -->
         <button id="mute-btn" class="w-12 h-12 rounded-full bg-gray-200 dark:bg-black border dark:border-gray-900 hover:bg-gray-300 dark:hover:bg-gray-900 transition flex items-center justify-center text-gray-600 dark:text-gray-400">
@@ -200,6 +196,11 @@
         <!-- Screen Share -->
         <button id="screen-btn" class="w-12 h-12 rounded-full bg-gray-200 dark:bg-black border dark:border-gray-900 hover:bg-gray-300 dark:hover:bg-gray-900 transition flex items-center justify-center text-gray-600 dark:text-gray-400">
             <i class="fas fa-desktop"></i>
+        </button>
+
+        <!-- Chat Toggle (Mobile) -->
+        <button id="open-chat-btn" class="w-12 h-12 rounded-full bg-gray-200 dark:bg-black border dark:border-gray-900 hover:bg-gray-300 dark:hover:bg-gray-900 transition flex items-center justify-center text-gray-600 dark:text-gray-400 md:hidden">
+            <i class="fas fa-comment"></i>
         </button>
         
         <!-- Leave -->
@@ -274,7 +275,7 @@
             }
         });
 
-        // Chat toggle fonksiyonu - artık sadece close-chat tarafından kullanılıyor
+        // Chat toggle fonksiyonu - MOBİL AÇ/KAPA
         function toggleChat() {
             const sidebar = document.getElementById('chat-sidebar');
             sidebar.classList.toggle('translate-x-full');
@@ -662,6 +663,10 @@
         document.getElementById('chat-input').addEventListener('keypress', (e) => {
             if(e.key === 'Enter') sendMessage();
         });
+
+        // MOBİL CHAT PANELİ KONTROL EVENTLERİ
+        document.getElementById('close-chat').addEventListener('click', toggleChat);
+        document.getElementById('open-chat-btn').addEventListener('click', toggleChat);
 
         // Kamera ve mikrofon ayarları - İZİN SONRA KATILIM
         navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
