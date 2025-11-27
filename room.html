@@ -1510,11 +1510,22 @@
                             audio: true
                         });
 
+                    // Audio track var mı kontrol et
+                    const audioTracks = screenStream.getAudioTracks();
+                    console.log("[SCREEN] Audio track sayısı:", audioTracks.length);
+
                     const screenVideoTrack =
                         screenStream.getVideoTracks()[0];
                     const screenAudioTrack =
-                        screenStream.getAudioTracks()[0];
+                        audioTracks[0] || null;
                     isScreenSharingWithAudio = !!screenAudioTrack;
+
+                    if (!screenAudioTrack) {
+                        appendSystemMessage(
+                            "Uyarı: Seçtiğin ekran/sekme paylaşımında tarayıcı herhangi bir ses kaynağı sağlamadı. " +
+                            "Eğer sekme sesini paylaşmak istiyorsan, ekran paylaşım penceresinden 'Chrome sekmesi' ve 'Sekme sesini paylaş' seçeneğini kullanmalısın."
+                        );
+                    }
 
                     showSelfScreenTile();
 
