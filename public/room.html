@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webber.io | Multiverse</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <!-- Tailwind Config -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                    display: ['Syne', 'sans-serif'],
+                },
+                extend: {
+                    colors: {
+                        void: '#000000',
+                        paper: '#ffffff',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'voiceWave': 'voiceWave 1.5s ease-in-out infinite',
+                        'blink': 'blink 1.5s step-end infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        voiceWave: {
+                            '0%, 100%': { transform: 'scaleY(1)', opacity: 0.7 },
+                            '50%': { transform: 'scaleY(2)', opacity: 1 },
+                        },
+                        blink: {
+                            '0%, 49%': { opacity: 1 },
+                            '50%, 100%': { opacity: 0.3 },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            transition: background-color 0.7s cubic-bezier(0.16, 1, 0.3, 1), color 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); }
+        
+        @keyframes messageFade {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-animate { animation: messageFade 0.3s ease-out; }
+        
+        ::selection { background: black; color: white; }
+        .dark ::selection { background: white; color: black; }
+        
+        ::placeholder { opacity: 0.3; font-weight: 400; }
+
+        /* Video Grid Layouts */
+        .video-grid-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+        .video-grid-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+        .video-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .video-grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .video-grid-6 { grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; }
+        .video-grid-9 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+    </style>
+</head>
+
+<body class="bg-paper dark:bg-void text-black dark:text-white h-screen flex flex-col overflow-hidden selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
+
+    <!-- CANVAS BACKGROUND -->
+    <canvas id="networkCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-25 dark:opacity-15"></canvas>
+
+    <!-- CONNECTION STATUS -->
+    <div id="connectionStatus" class="absolute top-0 left-0 right-0 z-30 h-1 bg-gradient-to-r from-black via-gray-500 to-white dark:from-white dark:via-gray-500 dark:to-black">
+        <div class="h-full w-full bg-current animate-pulse-slow"></div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="relative z-20 w-full px-6 md:px-8 py-4 flex justify-between items-center border-b border-black/10 dark:border-white/10">
+        <div class="flex items-center gap-4">
+            <button onclick="leaveRoom()" class="group flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <i class="fas fa-arrow-left text-sm"></i>
+                <span class="font-mono text-[10px] md:text-xs uppercase tracking-widest opacity-60 group-hover:opacity-100">Exit</span>
+            </button>
+            <div class="flex flex-col">
+                <h1 class="font-display font-bold text-lg md:text-2xl tracking-tighter uppercase">
+                    /<span id="roomId" class="text-black/70 dark:text-white/70">MULTIVERSE</span>
+                </h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <div id="peerCount" class="text-[10px] md:text-xs font-mono uppercase tracking-widest opacity-50">1 Peer</div>
+                    <button onclick="copyRoomLink()" class="opacity-40 hover:opacity-100 transition-opacity">
+                        <i class="fas fa-copy text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Mode Indicator -->
+        <div class="hidden md:flex items-center gap-3 text-xs font-mono uppercase tracking-widest opacity-60">
+            <span id="modeIndicator">Chat Mode</span>
+        </div>
+
+        <!-- Theme Switcher -->
+        <button id="theme-toggle" class="group flex items-center gap-3">
+            <span class="hidden md:block text-xs font-mono uppercase tracking-widest group-hover:tracking-[0.2em] transition-all duration-300 opacity-60 group-hover:opacity-100">Mode</span>
+            <div class="w-10 h-5 rounded-full border border-current flex items-center px-1 relative">
+                <div id="toggle-dot" class="w-3 h-3 bg-current rounded-full transition-transform duration-300 transform translate-x-4 dark:translate-x-0"></div>
+            </div>
+        </button>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="relative z-10 flex-1 flex overflow-hidden">
+        
+        <!-- CHAT MODE -->
+        <div id="chatMode" class="mode-content flex-1 flex flex-col">
+            <div id="messages" class="flex-1 overflow-y-auto px-6 md:px-8 py-6 space-y-4">
+                <div class="message-animate flex items-start gap-3 opacity-60">
+                    <div class="w-8 h-8 rounded-full border border-current flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-info text-xs"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-mono text-[10px] uppercase tracking-widest opacity-50 mb-1">System</div>
+                        <div class="text-sm bg-black/5 dark:bg-white/5 inline-block px-2 py-1 rounded">
+                            Multiverse odasına bağlandınız. Mod seçin.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-black/10 dark:border-white/10 px-6 md:px-8 py-4">
+                <div class="flex items-end gap-3">
+                    <div class="relative">
+                        <input type="file" id="fileInput" class="hidden" multiple>
+                        <button onclick="document.getElementById('fileInput').click()" 
+                                class="w-10 h-10 rounded-full border border-current flex items-center justify-center hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
+                            <i class="fas fa-paperclip text-sm"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 relative group">
+                        <form onsubmit="sendMessage(event)" class="relative">
+                            <input id="messageInput" type="text" 
+                                   class="w-full bg-transparent py-3 text-sm md:text-base outline-none placeholder-black dark:placeholder-white"
+                                   placeholder="Type message..." autocomplete="off">
+                            <div class="absolute bottom-0 left-0 w-full h-[1px] bg-black/10 dark:bg-white/10"></div>
+                            <div class="absolute bottom-0 left-0 w-0 h-[1px] bg-black dark:bg-white transition-all duration-300 group-focus-within:w-full"></div>
+                        </form>
+                    </div>
+
+                    <button onclick="sendMessage(event)" 
+                            class="w-10 h-10 rounded-full border-2 border-black dark:border-white flex items-center justify-center hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all transform hover:scale-110 active:scale-95">
+                        <i class="fas fa-arrow-up text-sm"></i>
+                    </button>
+                </div>
+                <div id="dropZone" class="hidden mt-3 p-3 border-2 border-dashed border-black/30 dark:border-white/30 rounded text-center text-xs font-mono uppercase tracking-widest opacity-60">
+                    Drop files here
+                </div>
+            </div>
+        </div>
+
+        <!-- VOICE MODE -->
+        <div id="voiceMode" class="mode-content hidden flex-1 flex flex-col items-center justify-center">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-8 p-8 w-full max-w-4xl">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="w-24 h-24 md:w-32 md:h-32 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center font-display font-bold text-2xl md:text-3xl">
+                        Y
+                    </div>
+                    <div class="text-xs font-mono opacity-60">YOU</div>
+                    <div class="flex gap-1 mt-2">
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: 0s;"></div>
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: 0.1s;"></div>
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: 0.2s;"></div>
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: 0.3s;"></div>
+                    </div>
+                </div>
+                <div id="voicePeers"></div>
+            </div>
+        </div>
+
+        <!-- VIDEO MODE -->
+        <div id="videoMode" class="mode-content hidden flex-1 p-4 md:p-6">
+            <div id="videoGrid" class="grid gap-4 h-full w-full auto-rows-fr video-grid-1">
+                <!-- Video containers dynamically added -->
+            </div>
+        </div>
+
+        <!-- SCREEN SHARE MODE -->
+        <div id="screenMode" class="mode-content hidden flex-1 p-4 md:p-6 relative">
+            <div class="flex gap-4 h-full">
+                <div class="flex-1 bg-black/5 dark:bg-white/5 rounded flex items-center justify-center">
+                    <i class="fas fa-desktop text-6xl opacity-20"></i>
+                </div>
+                <div class="w-64 space-y-4">
+                    <div class="aspect-video bg-black/10 dark:bg-white/10 rounded flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="w-16 h-16 rounded-full bg-black/20 dark:bg-white/20 flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-user text-xl opacity-40"></i>
+                            </div>
+                            <div class="text-xs font-mono opacity-50">YOU</div>
+                        </div>
+                    </div>
+                    <div id="screenSharePeers" class="space-y-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PEERS SIDEBAR (Desktop) -->
+        <aside id="peersSidebar" class="hidden lg:flex flex-col w-80 border-l border-black/10 dark:border-white/10 p-6">
+            <h3 class="font-display font-bold text-sm uppercase tracking-widest opacity-60 mb-4">Connected Peers</h3>
+            <div id="peersList" class="flex-1 space-y-3"></div>
+            <div class="mt-6 space-y-3 border-t border-black/10 dark:border-white/10 pt-4">
+                <button onclick="toggleMode('voice')" class="w-full py-2 text-xs font-mono uppercase tracking-widest border border-current hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
+                    <i class="fas fa-phone mr-2"></i>Voice Call
+                </button>
+                <button onclick="toggleMode('video')" class="w-full py-2 text-xs font-mono uppercase tracking-widest border border-current hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
+                    <i class="fas fa-video mr-2"></i>Video Call
+                </button>
+                <button onclick="toggleMode('screen')" class="w-full py-2 text-xs font-mono uppercase tracking-widest border border-current hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
+                    <i class="fas fa-desktop mr-2"></i>Screen Share
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- CONTROL BAR -->
+    <div id="controlBar" class="relative z-20 border-t border-black/10 dark:border-white/10 p-4 md:p-6">
+        <div class="flex items-center justify-center gap-4 md:gap-6">
+            <!-- Mode Selector -->
+            <div class="flex items-center gap-2 md:gap-3 bg-black/5 dark:bg-white/5 rounded-full p-1">
+                <button onclick="toggleMode('chat')" id="btn-chat" class="mode-btn px-3 py-2 rounded-full text-xs md:text-sm font-mono uppercase tracking-widest transition-all bg-black text-white dark:bg-white dark:text-black">
+                    <i class="fas fa-comment mr-1"></i>Chat
+                </button>
+                <button onclick="toggleMode('voice')" id="btn-voice" class="mode-btn px-3 py-2 rounded-full text-xs md:text-sm font-mono uppercase tracking-widest transition-all opacity-60 hover:opacity-100">
+                    <i class="fas fa-phone mr-1"></i>Voice
+                </button>
+                <button onclick="toggleMode('video')" id="btn-video" class="mode-btn px-3 py-2 rounded-full text-xs md:text-sm font-mono uppercase tracking-widest transition-all opacity-60 hover:opacity-100">
+                    <i class="fas fa-video mr-1"></i>Video
+                </button>
+                <button onclick="toggleMode('screen')" id="btn-screen" class="mode-btn px-3 py-2 rounded-full text-xs md:text-sm font-mono uppercase tracking-widest transition-all opacity-60 hover:opacity-100">
+                    <i class="fas fa-desktop mr-1"></i>Screen
+                </button>
+            </div>
+
+            <!-- Call Controls -->
+            <div class="flex items-center gap-3">
+                <button id="micBtn" onclick="toggleMic()" class="w-12 h-12 rounded-full border-2 border-black dark:border-white flex items-center justify-center hover:scale-110 transition-transform bg-black text-white dark:bg-white dark:text-black">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="camBtn" onclick="toggleCam()" class="w-12 h-12 rounded-full border-2 border-black dark:border-white flex items-center justify-center hover:scale-110 transition-transform opacity-40">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button onclick="leaveRoom()" class="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center hover:scale-110 transition-transform">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="relative z-20 w-full py-4 px-6 md:px-8 flex justify-between items-end text-[10px] md:text-xs font-mono uppercase tracking-widest opacity-40">
+        <div>
+            Secure P2P Protocol<br>Latency: <span id="latency">24ms</span> | Mode: <span id="footerMode">Chat</span>
+        </div>
+        <div class="text-right">
+            <span id="connectionType">WebRTC</span> Direct<br>
+            <span id="uptime">00:00:00</span>
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME & CANVAS (Shared) ---
+        const html = document.documentElement;
+        const toggleBtn = document.getElementById('theme-toggle');
+        const toggleDot = document.getElementById('toggle-dot');
+
+        if (!localStorage.getItem('theme')) localStorage.setItem('theme', 'dark');
+
+        if (localStorage.getItem('theme') === 'dark') {
+            html.classList.add('dark');
+            toggleDot.classList.remove('translate-x-4');
+        } else {
+            html.classList.remove('dark');
+            toggleDot.classList.add('translate-x-4');
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            if (html.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+                toggleDot.classList.remove('translate-x-4');
+            } else {
+                localStorage.setItem('theme', 'light');
+                toggleDot.classList.add('translate-x-4');
+            }
+        });
+
+        // Canvas Animation
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, particles = [], isDark = html.classList.contains('dark');
+        let particleColor = isDark ? 'rgba(255, 255, 255, ' : 'rgba(0, 0, 0, ';
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.size = Math.random() * 2 + 1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = particleColor + '0.5)';
+                ctx.fill();
+            }
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach((p, index) => {
+                p.update(); p.draw();
+                for (let j = index; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x, dy = p.y - p2.y, distance = Math.sqrt(dx*dx + dy*dy);
+                    if (distance < 120) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = particleColor + (1 - distance/120) * 0.15 + ')';
+                        ctx.lineWidth = 0.5; ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+                    }
+                }
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => { resize(); initParticles(); });
+        resize(); initParticles(); animate();
+
+        function initParticles() {
+            particles = [];
+            const count = Math.floor((width * height) / 15000);
+            for (let i = 0; i < count; i++) particles.push(new Particle());
+        }
+
+        // --- ROOM STATE MANAGEMENT ---
+        const roomId = new URLSearchParams(window.location.search).get('room') || 'MULTIVERSE';
+        document.getElementById('roomId').textContent = roomId;
+        
+        let currentMode = 'chat';
+        let peerCount = 1;
+        let startTime = Date.now();
+        let isMicOn = true, isCamOn = false;
+        
+        const simulatedPeers = [
+            { id: 'peer_7f3a', name: 'AGENT_1', latency: 24 },
+            { id: 'peer_9c2b', name: 'AGENT_2', latency: 42 }
+        ];
+
+        // Mode Management
+        function toggleMode(mode) {
+            document.querySelectorAll('.mode-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(mode + 'Mode').classList.remove('hidden');
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-black', 'text-white', 'dark:bg-white', 'dark:text-black');
+                btn.classList.add('opacity-60');
+            });
+            
+            const activeBtn = document.getElementById('btn-' + mode);
+            activeBtn.classList.add('bg-black', 'text-white', 'dark:bg-white', 'dark:text-black');
+            activeBtn.classList.remove('opacity-60');
+            
+            currentMode = mode;
+            document.getElementById('modeIndicator').textContent = mode.charAt(0).toUpperCase() + mode.slice(1) + ' Mode';
+            document.getElementById('footerMode').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+            
+            if (mode === 'video') setupVideoGrid();
+            if (mode === 'voice') setupVoicePeers();
+            if (mode === 'screen') setupScreenShare();
+        }
+
+        // --- CHAT LOGIC ---
+        function sendMessage(e) {
+            e?.preventDefault();
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const messages = document.getElementById('messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message-animate flex items-start gap-3 justify-end';
+            msgEl.innerHTML = `
+                <div class="flex-1 flex justify-end">
+                    <div class="bg-black text-white dark:bg-white dark:text-black px-4 py-3 rounded-lg max-w-xs md:max-w-md">
+                        <div class="text-sm">${text}</div>
+                        <div class="text-[10px] opacity-60 mt-1 font-mono text-right">YOU</div>
+                    </div>
+                </div>
+                <div class="w-8 h-8 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-display font-bold text-sm flex-shrink-0">Y</div>
+            `;
+            messages.appendChild(msgEl);
+            messages.scrollTop = messages.scrollHeight;
+            input.value = '';
+
+            if (Math.random() > 0.5) {
+                setTimeout(() => {
+                    const peer = simulatedPeers[Math.floor(Math.random() * simulatedPeers.length)];
+                    addPeerMessage(peer.name, ["Roger", "Copy", "Acknowledged"][Math.floor(Math.random() * 3)]);
+                }, 500 + Math.random() * 2000);
+            }
+        }
+
+        function addPeerMessage(peerName, text) {
+            const messages = document.getElementById('messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message-animate flex items-start gap-3';
+            msgEl.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center font-display font-bold text-sm flex-shrink-0">${peerName.charAt(0)}</div>
+                <div class="flex-1">
+                    <div class="text-[10px] font-mono uppercase tracking-widest opacity-50 mb-1">${peerName}</div>
+                    <div class="bg-black/5 dark:bg-white/5 px-4 py-3 rounded-lg max-w-xs md:max-w-md"><div class="text-sm">${text}</div></div>
+                </div>
+            `;
+            messages.appendChild(msgEl);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // --- VOICE MODE ---
+        function setupVoicePeers() {
+            const container = document.getElementById('voicePeers');
+            container.innerHTML = '';
+            simulatedPeers.forEach(peer => {
+                const peerEl = document.createElement('div');
+                peerEl.className = 'flex flex-col items-center gap-3';
+                peerEl.innerHTML = `
+                    <div class="w-24 h-24 md:w-32 md:h-32 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center font-display font-bold text-2xl md:text-3xl">${peer.name.charAt(0)}</div>
+                    <div class="text-xs font-mono opacity-60">${peer.name}</div>
+                    <div class="flex gap-1 mt-2">
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: ${Math.random() * 0.5}s;"></div>
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: ${Math.random() * 0.5}s;"></div>
+                        <div class="w-1 h-4 bg-current animate-voiceWave" style="animation-delay: ${Math.random() * 0.5}s;"></div>
+                        <div class="w-1 h-4 bg-current" style="opacity: 0.3;"></div>
+                    </div>
+                `;
+                container.appendChild(peerEl);
+            });
+        }
+
+        // --- VIDEO MODE ---
+        function setupVideoGrid() {
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = '';
+            
+            // Local video placeholder
+            const localVideo = createVideoTile('YOU', true);
+            grid.appendChild(localVideo);
+            
+            // Remote peers
+            simulatedPeers.forEach(peer => {
+                grid.appendChild(createVideoTile(peer.name, false));
+            });
+            
+            updateVideoGrid();
+        }
+
+        function createVideoTile(name, isLocal) {
+            const tile = document.createElement('div');
+            tile.className = 'bg-black/5 dark:bg-white/5 rounded flex items-center justify-center relative overflow-hidden';
+            tile.innerHTML = `
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="w-20 h-20 rounded-full bg-black/20 dark:bg-white/20 flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-user text-2xl opacity-40"></i>
+                        </div>
+                        <div class="text-xs font-mono opacity-50">${name}</div>
+                        <div class="text-[10px] font-mono opacity-40 mt-1">${isLocal ? 'Local' : 'Remote'}</div>
+                    </div>
+                </div>
+                <div class="absolute top-3 right-3 w-3 h-3 rounded-full bg-current animate-pulse"></div>
+            `;
+            return tile;
+        }
+
+        function updateVideoGrid() {
+            const grid = document.getElementById('videoGrid');
+            const count = simulatedPeers.length + 1;
+            
+            // Remove all grid classes
+            grid.className = grid.className.replace(/video-grid-\d+/g, '');
+            
+            // Apply appropriate grid
+            if (count <= 2) grid.classList.add('video-grid-2');
+            else if (count <= 4) grid.classList.add('video-grid-4');
+            else if (count <= 6) grid.classList.add('video-grid-6');
+            else grid.classList.add('video-grid-9');
+        }
+
+        // --- SCREEN SHARE MODE ---
+        function setupScreenShare() {
+            const peersContainer = document.getElementById('screenSharePeers');
+            peersContainer.innerHTML = '';
+            
+            simulatedPeers.forEach(peer => {
+                const peerEl = document.createElement('div');
+                peerEl.className = 'aspect-video bg-black/10 dark:bg-white/10 rounded flex items-center justify-center';
+                peerEl.innerHTML = `
+                    <div class="text-center">
+                        <div class="w-12 h-12 rounded-full bg-black/20 dark:bg-white/20 flex items-center justify-center mx-auto mb-1">
+                            <i class="fas fa-user text-sm opacity-40"></i>
+                        </div>
+                        <div class="text-xs font-mono opacity-50">${peer.name}</div>
+                    </div>
+                `;
+                peersContainer.appendChild(peerEl);
+            });
+            
+            // Simulate screen share active
+            setTimeout(() => {
+                addSystemMessage('Screen sharing active (simulated)');
+            }, 500);
+        }
+
+        // --- CALL CONTROLS ---
+        function toggleMic() {
+            isMicOn = !isMicOn;
+            const btn = document.getElementById('micBtn');
+            btn.classList.toggle('opacity-40');
+            btn.innerHTML = `<i class="fas fa-microphone${isMicOn ? '' : '-slash'}"></i>`;
+            addSystemMessage(`Mic ${isMicOn ? 'unmuted' : 'muted'}`);
+        }
+
+        function toggleCam() {
+            isCamOn = !isCamOn;
+            const btn = document.getElementById('camBtn');
+            btn.classList.toggle('opacity-40');
+            btn.innerHTML = `<i class="fas fa-video${isCamOn ? '' : '-slash'}"></i>`;
+            addSystemMessage(`Camera ${isCamOn ? 'enabled' : 'disabled'}`);
+        }
+
+        // --- PEER MANAGEMENT ---
+        function addSystemMessage(text) {
+            const messages = document.getElementById('messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message-animate flex items-start gap-3 opacity-60';
+            msgEl.innerHTML = `
+                <div class="w-8 h-8 rounded-full border border-current flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-info text-xs"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-mono text-[10px] uppercase tracking-widest opacity-50 mb-1">System</div>
+                    <div class="text-sm bg-black/5 dark:bg-white/5 inline-block px-2 py-1 rounded">${text}</div>
+                </div>
+            `;
+            messages.appendChild(msgEl);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function updatePeerCount() {
+            document.getElementById('peerCount').textContent = `${peerCount} Peer${peerCount > 1 ? 's' : ''}`;
+        }
+
+        // Simulate peer connections
+        setTimeout(() => {
+            simulatedPeers.forEach((peer, i) => {
+                setTimeout(() => {
+                    peerCount++;
+                    updatePeerCount();
+                    addSystemMessage(`${peer.name} connected [${peer.latency}ms]`);
+                }, (i + 1) * 2000);
+            });
+        }, 1000);
+
+        // --- FILE HANDLING ---
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+
+        fileInput.addEventListener('change', handleFiles);
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            document.body.addEventListener(eventName, () => dropZone.classList.remove('hidden'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, () => dropZone.classList.add('hidden'), false);
+        });
+
+        document.body.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            handleFiles({ target: { files: e.dataTransfer.files } });
+        }
+
+        function handleFiles(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                addSystemMessage(`File shared: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`);
+                setTimeout(() => {
+                    const peer = simulatedPeers[Math.floor(Math.random() * simulatedPeers.length)];
+                    addSystemMessage(`<em>${peer.name} downloaded ${file.name}</em>`);
+                }, 1000 + Math.random() * 3000);
+            });
+        }
+
+        // --- UTILITY ---
+        function leaveRoom() {
+            if (confirm('Odayı terketmek istiyor musunuz?')) {
+                window.location.href = 'index.html';
+            }
+        }
+
+        function copyRoomLink() {
+            const link = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+            navigator.clipboard.writeText(link).then(() => {
+                addSystemMessage('Room link copied');
+            });
+        }
+
+        // Update stats
+        setInterval(() => {
+            const uptime = Date.now() - startTime;
+            const hours = Math.floor(uptime / 3600000).toString().padStart(2, '0');
+            const minutes = Math.floor((uptime % 3600000) / 60000).toString().padStart(2, '0');
+            const seconds = Math.floor((uptime % 60000) / 1000).toString().padStart(2, '0');
+            document.getElementById('uptime').textContent = `${hours}:${minutes}:${seconds}`;
+            document.getElementById('latency').textContent = `${20 + Math.floor(Math.random() * 30)}ms`;
+        }, 1000);
+
+        // Init
+        document.getElementById('messageInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(e);
+            }
+        });
+    </script>
+</body>
+</html>

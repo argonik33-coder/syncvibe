@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webber.io | The Monochrome Era</title>
+    
+    <!-- Google Fonts: Syne (Artistik) & Inter (Okunaklı) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                    display: ['Syne', 'sans-serif'], // Başlıklar için özel font
+                },
+                extend: {
+                    colors: {
+                        // Mutlak Siyah ve Beyaz
+                        void: '#000000',
+                        paper: '#ffffff',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Özel CSS Ayarları */
+        body {
+            /* Yumuşak renk geçişi */
+            transition: background-color 0.7s cubic-bezier(0.16, 1, 0.3, 1), color 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        /* İmleç altındaki rengin tersini alsın */
+        .blend-cursor {
+            mix-blend-mode: difference;
+        }
+
+        /* Input placeholder rengi */
+        ::placeholder {
+            opacity: 0.3; 
+            font-weight: 400;
+        }
+    </style>
+</head>
+<!-- 
+    DARK MODE: bg-black text-white 
+    LIGHT MODE: bg-white text-black 
+-->
+<body class="bg-paper dark:bg-void text-black dark:text-white h-screen flex flex-col overflow-hidden relative selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black">
+
+    <!-- CANVAS BACKGROUND (Javascript ile çizilecek) -->
+    <canvas id="networkCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-40 dark:opacity-30"></canvas>
+
+    <!-- HEADER -->
+    <header class="relative z-20 w-full px-8 py-8 flex justify-between items-center">
+        <div class="flex flex-col">
+            <h1 class="font-display font-bold text-2xl tracking-tighter uppercase">
+                Webber<span class="opacity-40">.io</span>
+            </h1>
+            <span class="text-[10px] tracking-[0.2em] uppercase font-bold opacity-50 mt-1">By YavuzSOFT</span>
+        </div>
+
+        <!-- Minimalist Theme Switcher -->
+        <button id="theme-toggle" class="group flex items-center gap-3 focus:outline-none">
+            <span class="text-xs font-mono uppercase tracking-widest group-hover:tracking-[0.2em] transition-all duration-300 opacity-60 group-hover:opacity-100">Switch Mode</span>
+            <div class="w-10 h-5 rounded-full border border-current flex items-center px-1 relative transition-colors">
+                <div id="toggle-dot" class="w-3 h-3 bg-current rounded-full transition-transform duration-300 transform translate-x-4 dark:translate-x-0"></div>
+            </div>
+        </button>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full max-w-5xl mx-auto">
+        
+        <!-- Büyük Başlık -->
+        <div class="text-center mb-16 relative">
+            <h2 class="font-display font-extrabold text-6xl md:text-8xl lg:text-9xl leading-[0.9] tracking-tight mix-blend-difference text-black dark:text-white animate-float">
+                PURE<br>CONNECTION
+            </h2>
+            <p class="mt-6 font-mono text-sm md:text-base opacity-60 tracking-widest uppercase">
+                [ No Login ] &nbsp; [ No Limits ] &nbsp; [ Pure Speed ]
+            </p>
+        </div>
+
+        <!-- Input Alanı -->
+        <div class="w-full max-w-md relative group">
+            <form onsubmit="joinRoom(event)" class="relative">
+                <!-- Alt Çizgi Animasyonu -->
+                <div class="absolute bottom-0 left-0 w-full h-[2px] bg-black/10 dark:bg-white/10"></div>
+                <div class="absolute bottom-0 left-0 w-0 h-[2px] bg-black dark:bg-white transition-all duration-500 group-focus-within:w-full"></div>
+
+                <div class="flex items-center">
+                    <span class="font-display text-2xl opacity-30 mr-2">/</span>
+                    <input 
+                        type="text" 
+                        id="roomName" 
+                        class="w-full bg-transparent py-4 text-2xl md:text-3xl font-display font-bold outline-none text-black dark:text-white placeholder-black dark:placeholder-white text-center md:text-left tracking-tight"
+                        placeholder="ROOM-NAME" 
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    
+                    <!-- Manyetik Buton -->
+                    <button 
+                        type="submit" 
+                        id="magnetic-btn"
+                        class="hidden md:flex w-14 h-14 rounded-full border-2 border-black dark:border-white items-center justify-center hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all duration-300 transform hover:scale-110 active:scale-95"
+                    >
+                        <i class="fa-solid fa-arrow-right text-xl"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Mobil İçin Buton (Alt kısımda görünsün) -->
+        <button onclick="document.querySelector('form').dispatchEvent(new Event('submit'))" class="mt-8 md:hidden w-full max-w-xs py-4 bg-black dark:bg-white text-white dark:text-black font-bold font-display tracking-wide uppercase text-sm hover:opacity-90 transition-opacity">
+            Connect Now
+        </button>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="relative z-20 w-full py-6 px-8 flex justify-between items-end text-[10px] md:text-xs font-mono uppercase tracking-widest opacity-40">
+        <div>
+            Secure P2P Protocol<br>v2.4.0-stable
+        </div>
+        <div class="text-right">
+            &copy; 2024 YavuzSOFT<br>Engineered for clarity
+        </div>
+    </footer>
+
+    <script>
+        // --- THEME MANAGER ---
+        const html = document.documentElement;
+        const toggleBtn = document.getElementById('theme-toggle');
+        const toggleDot = document.getElementById('toggle-dot');
+
+        // Varsayılan olarak Dark Mode (Siyah zemin üzerine beyaz) daha fantastik durur.
+        if (!localStorage.getItem('theme')) localStorage.setItem('theme', 'dark');
+
+        if (localStorage.getItem('theme') === 'dark') {
+            html.classList.add('dark');
+            toggleDot.classList.remove('translate-x-4'); // Sola çek (Dark)
+        } else {
+            html.classList.remove('dark');
+            toggleDot.classList.add('translate-x-4'); // Sağa çek (Light)
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            if (html.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+                toggleDot.classList.remove('translate-x-4');
+                updateCanvasColor(true); // Canvas rengini güncelle
+            } else {
+                localStorage.setItem('theme', 'light');
+                toggleDot.classList.add('translate-x-4');
+                updateCanvasColor(false); // Canvas rengini güncelle
+            }
+        });
+
+        // --- CANVAS ANIMATION (NETWORK EFFECT) ---
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        let isDark = html.classList.contains('dark');
+
+        // Renkler (Siyah veya Beyaz)
+        let particleColor = isDark ? 'rgba(255, 255, 255, ' : 'rgba(0, 0, 0, ';
+
+        function updateCanvasColor(dark) {
+            isDark = dark;
+            particleColor = isDark ? 'rgba(255, 255, 255, ' : 'rgba(0, 0, 0, ';
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.5; // Yavaş hareket
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.size = Math.random() * 2 + 1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = particleColor + '0.5)';
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = Math.floor((width * height) / 15000); // Ekran boyutuna göre sayı
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        // Mouse etkileşimi
+        let mouse = { x: null, y: null };
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+        window.addEventListener('mouseout', () => {
+            mouse.x = null;
+            mouse.y = null;
+        });
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            particles.forEach((p, index) => {
+                p.update();
+                p.draw();
+
+                // Parçacıkları birbirine bağla
+                for (let j = index; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+
+                    if (distance < 120) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = particleColor + (1 - distance/120) * 0.15 + ')';
+                        ctx.lineWidth = 0.5;
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+
+                // Mouse ile etkileşim (Ağları mouse'a bağla)
+                if (mouse.x) {
+                    const dx = p.x - mouse.x;
+                    const dy = p.y - mouse.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    if (distance < 150) {
+                         ctx.beginPath();
+                        ctx.strokeStyle = particleColor + (1 - distance/150) * 0.2 + ')';
+                        ctx.lineWidth = 0.8;
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(mouse.x, mouse.y);
+                        ctx.stroke();
+                    }
+                }
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            resize();
+            initParticles();
+        });
+
+        resize();
+        initParticles();
+        animate();
+
+
+        // --- FORM & BUTTON LOGIC ---
+        const magneticBtn = document.getElementById('magnetic-btn');
+        
+        // Manyetik Buton Efekti
+        if(window.innerWidth > 768) {
+            magneticBtn.addEventListener('mousemove', (e) => {
+                const pos = magneticBtn.getBoundingClientRect();
+                const x = e.clientX - pos.left - pos.width / 2;
+                const y = e.clientY - pos.top - pos.height / 2;
+                
+                magneticBtn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px) scale(1.1)`;
+            });
+
+            magneticBtn.addEventListener('mouseleave', () => {
+                magneticBtn.style.transform = `translate(0px, 0px) scale(1)`;
+            });
+        }
+
+        function joinRoom(e) {
+            e.preventDefault();
+            const input = document.getElementById('roomName');
+            let room = input.value.trim();
+            
+            if (!room) {
+                // Rastgele oda adı
+                const words = ["VOID", "ZERO", "FLUX", "CORE", "NEXUS", "ECHO"];
+                const r1 = words[Math.floor(Math.random() * words.length)];
+                const r2 = words[Math.floor(Math.random() * words.length)];
+                const r3 = Math.floor(Math.random() * 999);
+                room = `${r1}-${r2}-${r3}`;
+            }
+            
+            room = room.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+            // UI Tepkisi
+            const body = document.body;
+            // Flash efekti (İnvert renk)
+            body.style.filter = "invert(1)";
+            
+            setTimeout(() => {
+                window.location.href = `room.html?room=${room}`;
+                body.style.filter = "invert(0)";
+            }, 300);
+        }
+    </script>
+</body>
+</html>
