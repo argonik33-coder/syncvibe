@@ -87,9 +87,9 @@
                 </ul>
 
                 <p class="text-xs text-slate-500">
-                    Not: WebRTC için bu proje ile birlikte gelen
-                    <span class="font-semibold">server.js</span> dosyasını Node.js ile
-                    çalıştırman gerekiyor.
+                    Not: Bu proje henüz
+                    <span class="font-semibold">geliştirme</span> aşamasında olmakta olup
+                    yaşadığınız hataları bildirmenizde fayda vardır.
                 </p>
             </section>
 
@@ -228,7 +228,14 @@
                 roomCode = raw;
             }
 
-            const url = `room.html?room=${encodeURIComponent(roomCode)}&name=${encodeURIComponent(username)}`;
+            // Kullanıcı adını URL'de göstermeden sessionStorage ile taşı
+            try {
+                sessionStorage.setItem("vibezone_username", username);
+            } catch (e) {
+                console.warn("sessionStorage yazılamadı:", e);
+            }
+
+            const url = `room.html?room=${encodeURIComponent(roomCode)}`;
             window.location.href = url;
         }
 
