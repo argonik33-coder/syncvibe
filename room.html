@@ -21,6 +21,11 @@
             background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
         }
 
+        /* Ayna efekti - tüm kamera videoları için kullanılacak */
+        .mirror {
+            transform: scaleX(-1);
+        }
+
         /* Chat container - sabit yükseklik ve scroll */
         #chatMessages {
             height: 300px;
@@ -147,7 +152,7 @@
         </div>
     </header>
 
-    <!-- Main Content (orta alan sabit yükseklikte, kendi içinde scroll) -->
+    <!-- Main Content (orta alan sabit yükseklik, kendi içinde scroll) -->
     <main class="flex-1 flex overflow-hidden min-h-0 pb-14 sm:pb-16">
         <!-- Video Grid -->
         <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden min-h-0">
@@ -156,9 +161,8 @@
                 <!-- Local Video -->
                 <div id="localTile"
                      class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
-                    <!-- muted: ekran sesi kendi kulağına dönmesin -->
                     <video id="localVideo" autoplay playsinline muted
-                           class="w-full h-full object-cover bg-black"></video>
+                           class="mirror w-full h-full object-cover bg-black"></video>
                     <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1">
                         <span id="localStatusDot" class="h-2 w-2 rounded-full bg-yellow-400"></span>
                         <span>Sen</span>
@@ -167,7 +171,6 @@
                         <i id="localMicIcon" class="fa-solid fa-microphone text-emerald-400"></i>
                         <span id="selfNameTag">Kullanıcı</span>
                     </div>
-                    <!-- Kamera kapalıyken gösterilecek -->
                     <div id="localCamOff"
                          class="absolute inset-0 bg-slate-900 flex items-center justify-center hidden">
                         <div class="text-center">
@@ -199,13 +202,11 @@
         <!-- Side Panel -->
         <aside id="sidePanel"
                class="hidden lg:flex flex-col w-80 border-l border-slate-800 bg-slate-950/95 flex-shrink-0">
-            <!-- Katılımcılar -->
             <div class="flex-shrink-0 border-b border-slate-800">
                 <div class="px-4 py-3 flex items-center justify-between">
                     <h2 class="text-sm font-semibold">
                         Katılımcılar (<span id="participantCount">1</span>)
                     </h2>
-                    <!-- Mobilde kapat butonu -->
                     <button id="btnSideClose"
                             class="lg:hidden text-slate-400 hover:text-slate-200 text-xs">
                         <i class="fa-solid fa-xmark"></i>
@@ -215,13 +216,11 @@
                     class="px-3 pb-3 space-y-1 text-xs max-h-32 overflow-y-auto"></ul>
             </div>
             
-            <!-- Sohbet -->
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex-shrink-0 px-4 py-2 border-b border-slate-800">
                     <h3 class="text-sm font-semibold">Sohbet</h3>
                 </div>
                 
-                <!-- Chat mesajları -->
                 <div id="chatMessages"
                      class="flex-1 px-4 py-2 space-y-2 text-sm overflow-y-auto">
                     <div class="text-center text-[11px] text-slate-500 py-2">
@@ -229,7 +228,6 @@
                     </div>
                 </div>
                 
-                <!-- Chat input -->
                 <form id="chatForm"
                       class="flex-shrink-0 border-t border-slate-800 px-3 py-2 flex gap-2">
                     <input id="chatInput" type="text" autocomplete="off"
@@ -244,7 +242,7 @@
         </aside>
     </main>
 
-    <!-- Bottom Controls: EKRANA SABİT -->
+    <!-- Bottom Controls: ekrana sabit -->
     <footer class="fixed inset-x-0 bottom-0 border-t border-slate-800 bg-slate-950/95 z-30">
         <div class="max-w-5xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-3">
             <button id="btnMic"
@@ -274,7 +272,6 @@
                 <i class="fa-solid fa-comments text-lg"></i>
             </button>
 
-            <!-- Emoji reaksiyonları -->
             <div id="reactionBar"
                  class="hidden sm:flex items-center gap-1 ml-2">
                 <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
@@ -370,11 +367,8 @@
         const signalingServerUrl =
             (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 
-        // Konuşma göstergesi
         let audioContext = null;
-        const speakingMonitors = new Map(); // id -> { analyser, dataArray, tileEl, speaking, lastHigh, source }
-
-        // Local ekran tile referansı
+        const speakingMonitors = new Map();
         let selfScreenTileEl = null;
         let selfScreenVideoEl = null;
 
@@ -469,7 +463,6 @@
             speakingMonitors.delete(id);
         }
 
-        // Local ekran tile oluştur/göster
         function showSelfScreenTile() {
             if (!screenStream) return;
             if (!selfScreenTileEl) {
@@ -481,7 +474,7 @@
                 const video = document.createElement("video");
                 video.autoplay = true;
                 video.playsInline = true;
-                video.muted = true; // ekran sesi geri dönmesin
+                video.muted = true;
                 video.className = "w-full h-full object-cover bg-black";
                 video.srcObject = screenStream;
 
@@ -518,7 +511,6 @@
             selfScreenVideoEl = null;
         }
 
-        // Spotlight
         function updateSpotlightUI() {
             localTile.classList.remove("tile-spotlight");
             if (selfScreenTileEl) selfScreenTileEl.classList.remove("tile-spotlight");
@@ -540,7 +532,6 @@
             }
         }
 
-        // Emoji reaksiyon
         function showReaction(peerId, emoji) {
             let tileEl = null;
             if (peerId === clientId) {
@@ -561,7 +552,6 @@
             setTimeout(() => el.remove(), 1200);
         }
 
-        // Bağlantı durumu
         function updateConnectionStatus(status, type = 'info') {
             const colors = {
                 'connecting': 'bg-yellow-900/50 border-yellow-700 text-yellow-400',
@@ -582,7 +572,6 @@
             `;
         }
 
-        // MEDYA
         async function requestMediaPermission() {
             if (mediaReady && localStream) {
                 mediaPermissionWarning.classList.add("hidden");
@@ -689,7 +678,6 @@
             await requestMediaPermission();
         });
 
-        // KATILIMCI LİSTESİ + HOST
         function updateParticipantCount() {
             participantCountEl.textContent = participants.size;
         }
@@ -844,7 +832,6 @@
             }
         });
 
-        // Sohbet
         function scrollChatToBottom() {
             setTimeout(() => {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -901,7 +888,6 @@
             chatInput.value = "";
         });
 
-        // Status & reaction helper
         function sendStatus(action, value) {
             if (!socket || socket.readyState !== WebSocket.OPEN) return;
             socket.send(
@@ -909,7 +895,6 @@
             );
         }
 
-        // VIDEO TILE (remote)
         function createRemoteTile(peerId, peerName) {
             const tile = document.createElement("div");
             tile.className =
@@ -919,7 +904,7 @@
             const video = document.createElement("video");
             video.autoplay = true;
             video.playsInline = true;
-            video.className = "w-full h-full object-cover bg-black";
+            video.className = "mirror w-full h-full object-cover bg-black";
             video.muted = false;
 
             const labelTop = document.createElement("div");
@@ -953,7 +938,6 @@
             return { videoEl: video, tileEl: tile };
         }
 
-        // WEBRTC
         async function getOrCreatePeerConnection(peerId, peerName) {
             if (peers.has(peerId)) return peers.get(peerId);
             if (!localStream) {
@@ -964,12 +948,10 @@
             console.log(`[PEER] Yeni bağlantı oluşturuluyor: ${peerName}`);
             const pc = new RTCPeerConnection(iceConfig);
 
-            // Ses (mikrofon)
             localStream.getAudioTracks().forEach((track) => {
                 pc.addTrack(track, localStream);
             });
 
-            // Video (kamera veya ekran)
             let initialVideoTrack = null;
             let initialStreamForVideo = null;
 
@@ -989,7 +971,6 @@
                 videoSender = transceiver.sender;
             }
 
-            // Ekran paylaşımı aktif ve sesli ise, sistem sesini de gönder
             if (isScreenSharing && screenStream && isScreenSharingWithAudio) {
                 const screenAudioTrack = screenStream.getAudioTracks()[0];
                 if (screenAudioTrack) {
@@ -1092,7 +1073,6 @@
             }
         }
 
-        // WEBSOCKET
         function connectSignaling() {
             socket = new WebSocket(signalingServerUrl);
             updateConnectionStatus("Bağlanıyor...", "connecting");
@@ -1228,9 +1208,16 @@
                             }
                         } else if (msg.action === "screen-share") {
                             const p = participants.get(msg.id);
+                            const peerInfo = peers.get(msg.id);
                             if (msg.value) {
                                 currentScreenSharerId = msg.id;
                                 updateSpotlightUI();
+
+                                // Ekran paylaşımı başlatan remote için mirror kapat (ekran ters görünmesin)
+                                if (peerInfo && peerInfo.videoEl) {
+                                    peerInfo.videoEl.classList.remove("mirror");
+                                }
+
                                 if (msg.id !== clientId) {
                                     appendSystemMessage(
                                         `${
@@ -1243,6 +1230,12 @@
                                     currentScreenSharerId = null;
                                     updateSpotlightUI();
                                 }
+
+                                // Ekran paylaşımı bitince kameraya dönen remote için mirror geri aç
+                                if (peerInfo && peerInfo.videoEl) {
+                                    peerInfo.videoEl.classList.add("mirror");
+                                }
+
                                 if (msg.id !== clientId) {
                                     appendSystemMessage(
                                         `${
@@ -1307,7 +1300,6 @@
             }
         }
 
-        // KONTROLLER
         function updateMicUI() {
             const icon = btnMic.querySelector("i");
             if (micEnabled) {
@@ -1386,7 +1378,6 @@
             );
         });
 
-        // El kaldır
         btnHand.addEventListener("click", () => {
             if (!socket || socket.readyState !== WebSocket.OPEN) return;
             handRaised = !handRaised;
@@ -1400,7 +1391,6 @@
             }
         });
 
-        // Emoji butonları
         reactionButtons.forEach((btn) => {
             btn.addEventListener("click", () => {
                 if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -1413,7 +1403,6 @@
             });
         });
 
-        // Ekran paylaşımı
         btnScreen.addEventListener("click", async () => {
             if (!localStream) return;
 
@@ -1535,7 +1524,6 @@
             appendSystemMessage("Ekran paylaşımı durduruldu");
         }
 
-        // Sohbet / Katılımcılar paneli toggle (mobil)
         function openMobileSidePanel() {
             sidePanel.classList.remove("hidden");
             sidePanel.classList.add("flex", "mobile-open");
@@ -1559,7 +1547,6 @@
             btnSideClose.addEventListener("click", closeMobileSidePanel);
         }
 
-        // Oda kodu kopyala
         copyCodeBtn.addEventListener("click", async () => {
             try {
                 await navigator.clipboard.writeText(roomCode);
@@ -1574,7 +1561,6 @@
             }
         });
 
-        // Ayrıl
         leaveBtn.addEventListener("click", () => {
             if (confirm("Toplantıdan ayrılmak istediğine emin misin?")) {
                 cleanup();
@@ -1592,7 +1578,6 @@
 
         window.addEventListener("beforeunload", cleanup);
 
-        // BAŞLAT
         (async () => {
             console.log("[INIT] Oda:", roomCode, "Kullanıcı:", userName);
             mediaPermissionWarning.classList.remove("hidden");
