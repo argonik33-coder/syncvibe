@@ -11,7 +11,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <style>
-        body { background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%); }
+        :root {
+            --app-height: 100vh;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            height: var(--app-height);
+            background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
+        }
         
         /* Chat container - sabit yükseklik ve scroll */
         #chatMessages {
@@ -99,7 +110,7 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col text-slate-100 overflow-hidden">
+<body class="flex flex-col text-slate-100 overflow-hidden">
     <!-- Header -->
     <header class="flex-shrink-0 w-full bg-slate-950/95 border-b border-slate-800">
         <div class="max-w-6xl mx-auto px-3 py-1.5 sm:px-4 sm:py-2.5 flex items-center justify-between">
@@ -261,6 +272,15 @@
     </footer>
 
     <script>
+        // Mobil 100vh düzeltme: URL bar'a göre gerçek yüksekliği kullan
+        function setAppHeight() {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', setAppHeight);
+        setAppHeight();
+
         // URL PARAMETRELERİ
         const params = new URLSearchParams(window.location.search);
         let roomCode = params.get("room");
