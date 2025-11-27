@@ -21,7 +21,7 @@
             background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
         }
 
-        /* Ayna efekti - tüm kamera videoları için kullanılacak */
+        /* Sadece local kamera için kullanılacak ayna efekti */
         .mirror {
             transform: scaleX(-1);
         }
@@ -67,7 +67,6 @@
             box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9),
                         0 0 28px rgba(129, 140, 248, 0.75);
         }
-        /* Daha küçük spotlight */
         @media (min-width: 640px) {
             .tile-spotlight {
                 grid-column: 1 / span 2;
@@ -152,7 +151,7 @@
         </div>
     </header>
 
-    <!-- Main Content (orta alan sabit yükseklik, kendi içinde scroll) -->
+    <!-- Main Content -->
     <main class="flex-1 flex overflow-hidden min-h-0 pb-14 sm:pb-16">
         <!-- Video Grid -->
         <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden min-h-0">
@@ -249,7 +248,7 @@
         </aside>
     </main>
 
-    <!-- Bottom Controls: ekrana sabit -->
+    <!-- Bottom Controls -->
     <footer class="fixed inset-x-0 bottom-0 border-t border-slate-800 bg-slate-950/95 z-30">
         <div class="max-w-5xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-3">
             <button id="btnMic"
@@ -949,7 +948,8 @@
             video.autoplay = true;
             video.playsInline = true;
             video.setAttribute("playsinline", "playsinline");
-            video.className = "mirror w-full h-full object-cover bg-black";
+            // Remote videolar mirror DEĞİL, sadece local kamera mirror
+            video.className = "w-full h-full object-cover bg-black";
             video.muted = false;
 
             const labelTop = document.createElement("div");
@@ -1312,21 +1312,13 @@
                             }
                         } else if (msg.action === "screen-share") {
                             const p = participants.get(msg.id);
-                            const peerInfo = peers.get(msg.id);
                             if (msg.value) {
                                 currentScreenSharerId = msg.id;
                                 updateSpotlightUI();
 
-                                // Ekran paylaşımı başlatan remote için mirror kapat (ekran ters görünmesin)
-                                if (peerInfo && peerInfo.videoEl) {
-                                    peerInfo.videoEl.classList.remove("mirror");
-                                }
-
                                 if (msg.id !== clientId) {
                                     appendSystemMessage(
-                                        `${
-                                            (p && p.name) || "Biri"
-                                        } ekran paylaşımı başlattı.`
+                                        `${(p && p.name) || "Biri"} ekran paylaşımı başlattı.`
                                     );
                                 }
                             } else {
@@ -1335,16 +1327,9 @@
                                     updateSpotlightUI();
                                 }
 
-                                // Ekran paylaşımı bitince kameraya dönen remote için mirror geri aç
-                                if (peerInfo && peerInfo.videoEl) {
-                                    peerInfo.videoEl.classList.add("mirror");
-                                }
-
                                 if (msg.id !== clientId) {
                                     appendSystemMessage(
-                                        `${
-                                            (p && p.name) || "Biri"
-                                        } ekran paylaşımını durdurdu.`
+                                        `${(p && p.name) || "Biri"} ekran paylaşımını durdurdu.`
                                     );
                                 }
                             }
