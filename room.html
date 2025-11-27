@@ -9,21 +9,13 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <style>
-        :root {
-            --app-height: 100vh;
-        }
-
-        html, body {
-            height: 100%;
-        }
-
         body {
-            height: var(--app-height);
             background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
         }
-        
+
         /* Chat container - sabit yükseklik ve scroll */
         #chatMessages {
             height: 300px;
@@ -31,7 +23,7 @@
             overflow-y: auto;
             scroll-behavior: smooth;
         }
-        
+
         /* Scrollbar stillemesi */
         #chatMessages::-webkit-scrollbar {
             width: 6px;
@@ -47,22 +39,23 @@
         #chatMessages::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
-        
-        /* Video grid responsive */
+
+        /* Video grid (flex ile zaten yükseklik alıyor, ekstra max-height yok) */
         #videoGrid {
-            max-height: calc(100vh - 200px);
             overflow-y: auto;
         }
 
         /* Konuşma göstergesi */
         .tile-speaking {
-            box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.9), 0 0 18px rgba(52, 211, 153, 0.6);
+            box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.9),
+                        0 0 18px rgba(52, 211, 153, 0.6);
         }
 
         /* Spotlight: ekran paylaşımı yapan */
         .tile-spotlight {
             order: -1;
-            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9), 0 0 28px rgba(129, 140, 248, 0.75);
+            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.9),
+                        0 0 28px rgba(129, 140, 248, 0.75);
         }
         /* Daha küçük spotlight */
         @media (min-width: 640px) {
@@ -110,7 +103,7 @@
         }
     </style>
 </head>
-<body class="flex flex-col text-slate-100 overflow-hidden">
+<body class="min-h-screen flex flex-col text-slate-100 overflow-hidden">
     <!-- Header -->
     <header class="flex-shrink-0 w-full bg-slate-950/95 border-b border-slate-800">
         <div class="max-w-6xl mx-auto px-3 py-1.5 sm:px-4 sm:py-2.5 flex items-center justify-between">
@@ -121,14 +114,18 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <span class="font-semibold text-lg">VibeZone</span>
-                        <span id="roomCodeBadge" class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono">
+                        <span id="roomCodeBadge"
+                              class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono">
                             #<span id="roomCodeText">------</span>
                         </span>
-                        <button id="copyCodeBtn" class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs hover:bg-slate-800">
+                        <button id="copyCodeBtn"
+                                class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-xs hover:bg-slate-800">
                             <i class="fa-solid fa-copy"></i> Kopyala
                         </button>
                     </div>
-                    <p class="text-xs text-slate-400">Sen: <span id="currentUserName" class="text-slate-200"></span></p>
+                    <p class="text-xs text-slate-400">
+                        Sen: <span id="currentUserName" class="text-slate-200"></span>
+                    </p>
                 </div>
             </div>
             <div class="flex items-center gap-2 text-xs">
@@ -138,7 +135,8 @@
                         <span>Bağlanıyor...</span>
                     </span>
                 </div>
-                <button id="btnLockRoom" class="hidden px-2 py-1 rounded-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] flex items-center gap-1">
+                <button id="btnLockRoom"
+                        class="hidden px-2 py-1 rounded-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-[11px] flex items-center gap-1">
                     <i class="fa-solid fa-lock-open"></i>
                     <span class="hidden sm:inline">Odayı kilitle</span>
                 </button>
@@ -150,11 +148,14 @@
     <main class="flex-1 flex overflow-hidden">
         <!-- Video Grid -->
         <section class="flex-1 flex flex-col bg-slate-900/80 overflow-hidden">
-            <div id="videoGrid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-4 overflow-y-auto">
+            <div id="videoGrid"
+                 class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-4 overflow-y-auto">
                 <!-- Local Video -->
-                <div id="localTile" class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
+                <div id="localTile"
+                     class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video">
                     <!-- muted: ekran sesi kendi kulağına dönmesin -->
-                    <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover bg-black"></video>
+                    <video id="localVideo" autoplay playsinline muted
+                           class="w-full h-full object-cover bg-black"></video>
                     <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs flex items-center gap-1">
                         <span id="localStatusDot" class="h-2 w-2 rounded-full bg-yellow-400"></span>
                         <span>Sen</span>
@@ -164,7 +165,8 @@
                         <span id="selfNameTag">Kullanıcı</span>
                     </div>
                     <!-- Kamera kapalıyken gösterilecek -->
-                    <div id="localCamOff" class="absolute inset-0 bg-slate-900 flex items-center justify-center hidden">
+                    <div id="localCamOff"
+                         class="absolute inset-0 bg-slate-900 flex items-center justify-center hidden">
                         <div class="text-center">
                             <i class="fa-solid fa-video-slash text-4xl text-slate-600 mb-2"></i>
                             <p class="text-sm text-slate-500">Kamera kapalı</p>
@@ -174,14 +176,16 @@
             </div>
             
             <!-- Medya izni uyarısı -->
-            <div id="mediaPermissionWarning" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-50">
+            <div id="mediaPermissionWarning"
+                 class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-50">
                 <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md text-center">
                     <i class="fa-solid fa-video text-5xl text-indigo-400 mb-4"></i>
                     <h2 class="text-xl font-semibold mb-2">Mikrofon (ve varsa kamera) izni gerekli</h2>
                     <p class="text-sm text-slate-400 mb-4">
                         Toplantıya katılmak için mikrofona (ve bağlıysa kameraya) tarayıcı üzerinden izin vermen gerekiyor.
                     </p>
-                    <button id="requestMediaBtn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium">
+                    <button id="requestMediaBtn"
+                            class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium">
                         <i class="fa-solid fa-unlock mr-2"></i>İzin Ver
                     </button>
                     <p id="mediaError" class="mt-3 text-xs text-rose-400 hidden"></p>
@@ -190,7 +194,8 @@
         </section>
 
         <!-- Side Panel -->
-        <aside id="sidePanel" class="hidden lg:flex flex-col w-80 border-l border-slate-800 bg-slate-950/95 flex-shrink-0">
+        <aside id="sidePanel"
+               class="hidden lg:flex flex-col w-80 border-l border-slate-800 bg-slate-950/95 flex-shrink-0">
             <!-- Katılımcılar -->
             <div class="flex-shrink-0 border-b border-slate-800">
                 <div class="px-4 py-3 flex items-center justify-between">
@@ -198,11 +203,13 @@
                         Katılımcılar (<span id="participantCount">1</span>)
                     </h2>
                     <!-- Mobilde kapat butonu -->
-                    <button id="btnSideClose" class="lg:hidden text-slate-400 hover:text-slate-200 text-xs">
+                    <button id="btnSideClose"
+                            class="lg:hidden text-slate-400 hover:text-slate-200 text-xs">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <ul id="participantsList" class="px-3 pb-3 space-y-1 text-xs max-h-32 overflow-y-auto"></ul>
+                <ul id="participantsList"
+                    class="px-3 pb-3 space-y-1 text-xs max-h-32 overflow-y-auto"></ul>
             </div>
             
             <!-- Sohbet -->
@@ -212,18 +219,21 @@
                 </div>
                 
                 <!-- Chat mesajları - SABİT YÜKSEKLİK -->
-                <div id="chatMessages" class="flex-1 px-4 py-2 space-y-2 text-sm overflow-y-auto">
+                <div id="chatMessages"
+                     class="flex-1 px-4 py-2 space-y-2 text-sm overflow-y-auto">
                     <div class="text-center text-[11px] text-slate-500 py-2">
                         Sohbete hoş geldin!
                     </div>
                 </div>
                 
                 <!-- Chat input -->
-                <form id="chatForm" class="flex-shrink-0 border-t border-slate-800 px-3 py-2 flex gap-2">
-                    <input id="chatInput" type="text" autocomplete="off" 
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" 
-                        placeholder="Mesaj yaz..." />
-                    <button type="submit" class="h-10 w-10 rounded-full bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center">
+                <form id="chatForm"
+                      class="flex-shrink-0 border-t border-slate-800 px-3 py-2 flex gap-2">
+                    <input id="chatInput" type="text" autocomplete="off"
+                           class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                           placeholder="Mesaj yaz..." />
+                    <button type="submit"
+                            class="h-10 w-10 rounded-full bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center">
                         <i class="fa-solid fa-paper-plane text-sm"></i>
                     </button>
                 </form>
@@ -234,37 +244,57 @@
     <!-- Bottom Controls -->
     <footer class="flex-shrink-0 border-t border-slate-800 bg-slate-950/95">
         <div class="max-w-5xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-3">
-            <button id="btnMic" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Mikrofon">
+            <button id="btnMic"
+                    class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                    title="Mikrofon">
                 <i class="fa-solid fa-microphone text-lg"></i>
             </button>
-            <button id="btnCam" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Kamera">
+            <button id="btnCam"
+                    class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                    title="Kamera">
                 <i class="fa-solid fa-video text-lg"></i>
             </button>
-            <button id="btnScreen" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Ekran Paylaş">
+            <button id="btnScreen"
+                    class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                    title="Ekran Paylaş">
                 <i class="fa-solid fa-display text-lg"></i>
             </button>
 
-            <button id="btnHand" class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="El kaldır">
+            <button id="btnHand"
+                    class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                    title="El kaldır">
                 <i class="fa-solid fa-hand-paper text-lg"></i>
             </button>
-            <button id="btnChatToggle" class="lg:hidden h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors" title="Sohbet">
+            <button id="btnChatToggle"
+                    class="lg:hidden h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                    title="Sohbet">
                 <i class="fa-solid fa-comments text-lg"></i>
             </button>
 
             <!-- Emoji reaksiyonları -->
-            <div id="reactionBar" class="hidden sm:flex items-center gap-1 ml-2">
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👍">👍</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="❤️">❤️</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👏">👏</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="😂">😂</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="😮">😮</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="🎉">🎉</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="🔥">🔥</button>
-                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn" data-emoji="👀">👀</button>
+            <div id="reactionBar"
+                 class="hidden sm:flex items-center gap-1 ml-2">
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="👍">👍</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="❤️">❤️</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="👏">👏</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="😂">😂</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="😮">😮</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="🎉">🎉</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="🔥">🔥</button>
+                <button class="h-8 w-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-base reaction-btn"
+                        data-emoji="👀">👀</button>
             </div>
 
             <div class="w-px h-8 bg-slate-700 mx-1"></div>
-            <button id="leaveBtn" class="h-11 sm:h-12 px-4 sm:px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors">
+            <button id="leaveBtn"
+                    class="h-11 sm:h-12 px-4 sm:px-5 rounded-full bg-rose-600 hover:bg-rose-500 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors">
                 <i class="fa-solid fa-phone-slash"></i>
                 <span class="hidden sm:inline">Ayrıl</span>
             </button>
@@ -272,15 +302,6 @@
     </footer>
 
     <script>
-        // Mobil 100vh düzeltme: URL bar'a göre gerçek yüksekliği kullan
-        function setAppHeight() {
-            const doc = document.documentElement;
-            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        }
-        window.addEventListener('resize', setAppHeight);
-        window.addEventListener('orientationchange', setAppHeight);
-        setAppHeight();
-
         // URL PARAMETRELERİ
         const params = new URLSearchParams(window.location.search);
         let roomCode = params.get("room");
